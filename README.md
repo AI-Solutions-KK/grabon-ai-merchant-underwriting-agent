@@ -1,6 +1,12 @@
-﻿![Arch](system-design.png)
+﻿
 ---
-# grabon-ai-merchant-underwriting-agent
+# Grabon-ai-merchant-underwriting-agent
+
+
+System Architecture 
+
+![Arch](system-design.png)
+---
 
 AI-powered Merchant Underwriting Agent using WhatsApp, deterministic risk scoring, and LLM-based reasoning.
 
