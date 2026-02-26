@@ -82,6 +82,22 @@ class RiskEngine:
         defaults_penalty = merchant.past_defaults * 10
         score -= defaults_penalty
         
+        # Refund rate penalty (if > 30%, significant risk)
+        if merchant.refund_rate > 0.30:
+            refund_penalty = 20
+            score -= refund_penalty
+        elif merchant.refund_rate > 0.15:
+            refund_penalty = 10
+            score -= refund_penalty
+        
+        # Chargeback rate penalty (if > 10%, significant risk)
+        if merchant.chargeback_rate > 0.10:
+            chargeback_penalty = 15
+            score -= chargeback_penalty
+        elif merchant.chargeback_rate > 0.05:
+            chargeback_penalty = 8
+            score -= chargeback_penalty
+        
         # Clamp between 0 and 100
         final_score = max(0, min(100, int(score)))
         

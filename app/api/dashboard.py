@@ -10,13 +10,16 @@ Provides:
 import logging
 from fastapi import APIRouter, Depends, Request, HTTPException, Form
 from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.merchant import Merchant
 from app.models.risk_score import RiskScore
-from app.main import templates
 
 logger = logging.getLogger(__name__)
+
+# Initialize templates
+templates = Jinja2Templates(directory="app/templates")
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

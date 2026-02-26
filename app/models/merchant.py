@@ -17,3 +17,6 @@ class Merchant(Base):
     years_in_business = Column(Integer, nullable=False)
     existing_loans = Column(Integer, nullable=False)
     past_defaults = Column(Integer, nullable=False)
+    gmv = Column(Float, default=0.0, nullable=True)  # Gross Merchandise Value
+    refund_rate = Column(Float, default=0.0, nullable=True)  # Refund rate as percentage (0-1)
+    chargeback_rate = Column(Float, default=0.0, nullable=True)  # Chargeback rate as percentage (0-1)

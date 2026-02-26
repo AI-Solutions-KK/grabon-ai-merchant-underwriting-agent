@@ -4,6 +4,7 @@ sqlalchemy==2.0.23
 pydantic==2.5.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
-alembic==1.13.0jinja2==3.1.6
+alembic==1.13.0
+jinja2==3.1.6
 anthropic==0.25.0
 twilio==8.12.0

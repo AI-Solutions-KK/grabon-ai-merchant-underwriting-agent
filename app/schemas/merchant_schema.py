@@ -13,6 +13,9 @@ class MerchantInput(BaseModel):
     years_in_business: int = Field(..., ge=0, description="Number of years the business has been operating")
     existing_loans: int = Field(..., ge=0, description="Number of existing loans")
     past_defaults: int = Field(..., ge=0, description="Number of past defaults")
+    gmv: float = Field(default=0.0, ge=0, description="Gross Merchandise Value in currency units")
+    refund_rate: float = Field(default=0.0, ge=0, le=1, description="Refund rate as percentage (0-1)")
+    chargeback_rate: float = Field(default=0.0, ge=0, le=1, description="Chargeback rate as percentage (0-1)")
 
     class Config:
         json_schema_extra = {
@@ -22,6 +25,9 @@ class MerchantInput(BaseModel):
                 "credit_score": 750,
                 "years_in_business": 5,
                 "existing_loans": 2,
-                "past_defaults": 0
+                "past_defaults": 0,
+                "gmv": 75000.0,
+                "refund_rate": 0.05,
+                "chargeback_rate": 0.02
             }
         }
