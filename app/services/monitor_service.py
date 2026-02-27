@@ -79,7 +79,8 @@ def _run_cycle(db_session_factory) -> dict:
     from app.services.config_service import get_config, set_config
     from app.services.whatsapp_service import WhatsAppService, normalize_wa_number
 
-    stats = {"processed": 0, "approved": 0, "rejected": 0, "wa_sent": 0, "wa_failed": 0, "wa_skipped": 0}
+    stats = {"processed": 0, "approved": 0, "rejected": 0, "wa_sent": 0, "wa_failed": 0, "wa_skipped": 0, "details": [], "rate_limited": False}
+    _rate_limited = False  # set True on first 63038 to skip remaining Twilio calls
 
     db = db_session_factory()
     try:
@@ -142,6 +143,7 @@ def _run_cycle(db_session_factory) -> dict:
                 if decision.decision == "REJECTED":
                     logger.info(f"[Monitor] {merchant.merchant_id} → REJECTED — no WA sent")
                     stats["rejected"] += 1
+                    stats["details"].append({"merchant_id": merchant.merchant_id, "name": getattr(merchant, "business_name", "") or merchant.merchant_id, "decision": "REJECTED", "wa": "skipped", "number": "", "reason": "Rejected"})
                     continue
                 stats["approved"] += 1
 
@@ -157,6 +159,13 @@ def _run_cycle(db_session_factory) -> dict:
                 if not to_number:
                     logger.info(f"[Monitor] {merchant.merchant_id} → no valid mobile, skip WA")
                     stats["wa_skipped"] += 1
+                    stats["details"].append({"merchant_id": merchant.merchant_id, "name": getattr(merchant, "business_name", "") or merchant.merchant_id, "decision": decision.decision, "wa": "skipped", "number": raw_dest or "", "reason": "No valid mobile"})
+                    continue
+
+                # If we already hit the daily rate-limit this cycle, skip without calling Twilio
+                if _rate_limited:
+                    stats["wa_failed"] += 1
+                    stats["details"].append({"merchant_id": merchant.merchant_id, "name": getattr(merchant, "business_name", "") or merchant.merchant_id, "decision": decision.decision, "wa": "failed", "number": to_number.replace("whatsapp:", ""), "reason": "[63038] Daily limit reached — skipped"})
                     continue
 
                 # Fetch latest risk record (just saved by orchestrator)
@@ -190,17 +199,28 @@ def _run_cycle(db_session_factory) -> dict:
                     secure_offer_link=offer_link,
                 )
 
-                wa_ok = result.get("status") in ("queued", "sent", "delivered")
+                wa_ok = (
+                    result.get("status") in ("queued", "sent", "delivered", "accepted")
+                    or (bool(result.get("sid")) and result.get("sid") not in ("N/A", "", None))
+                )
                 if saved_rs:
                     saved_rs.whatsapp_status = "SENT" if wa_ok else "FAILED"
                     db.commit()
 
                 if wa_ok:
-                    logger.info(f"[Monitor] ✅ WA sent → {merchant.merchant_id} | {to_number} | sid={result.get('sid')}")
+                    logger.info(f"[Monitor] \u2705 WA sent \u2192 {merchant.merchant_id} | {to_number} | sid={result.get('sid')}")
                     stats["wa_sent"] += 1
+                    stats["details"].append({"merchant_id": merchant.merchant_id, "name": getattr(merchant, "business_name", "") or merchant.merchant_id, "decision": decision.decision, "wa": "sent", "number": to_number.replace("whatsapp:", ""), "reason": ""})
                 else:
-                    logger.warning(f"[Monitor] ❌ WA failed → {merchant.merchant_id} | {result.get('error')}")
+                    err_msg = result.get("error", "Twilio error")
+                    # Detect daily rate-limit — flag all subsequent sends as skipped
+                    if "63038" in str(err_msg):
+                        _rate_limited = True
+                        stats["rate_limited"] = True
+                        logger.warning(f"[Monitor] Twilio daily limit hit — remaining WA sends will be skipped this cycle")
+                    logger.warning(f"[Monitor] \u274c WA failed \u2192 {merchant.merchant_id} | {err_msg}")
                     stats["wa_failed"] += 1
+                    stats["details"].append({"merchant_id": merchant.merchant_id, "name": getattr(merchant, "business_name", "") or merchant.merchant_id, "decision": decision.decision, "wa": "failed", "number": to_number.replace("whatsapp:", ""), "reason": err_msg})
 
             except Exception as e:
                 logger.error(f"[Monitor] Error processing {merchant.merchant_id}: {e}", exc_info=True)
@@ -213,6 +233,20 @@ def _run_cycle(db_session_factory) -> dict:
         db.close()
 
     logger.info(f"[Monitor] Cycle done — {stats}")
+
+    # Persist summary so dashboard banner always reflects the latest cycle
+    try:
+        from app.db.session import SessionLocal as _SL
+        from app.services.config_service import set_config as _sc
+        import json as _j
+        _db = _SL()
+        try:
+            _sc(_db, "last_engine_summary", _j.dumps(stats))
+        finally:
+            _db.close()
+    except Exception as _e:
+        logger.warning(f"[Monitor] Could not persist cycle stats: {_e}")
+
     return stats
 
 

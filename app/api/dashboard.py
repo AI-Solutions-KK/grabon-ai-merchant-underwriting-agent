@@ -323,7 +323,10 @@ def update_mobile_inline(merchant_id: str, request: Request, mobile_number: str 
                     financial_offer=fo_dict,
                     secure_offer_link=offer_link,
                 )
-                wa_sent = result.get("status") in ("queued", "sent", "delivered")
+                wa_sent = (
+                    result.get("status") in ("queued", "sent", "delivered", "accepted")
+                    or (bool(result.get("sid")) and result.get("sid") not in ("N/A", "", None))
+                )
                 wa_status = "sent" if wa_sent else "failed"
                 if wa_sent:
                     risk_score.whatsapp_status = "SENT"

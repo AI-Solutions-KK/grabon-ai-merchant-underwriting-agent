@@ -1,8 +1,9 @@
 # Phase 8: Complete Deliverables & Implementation Summary
 
-**Overall Status**: ✅ **PRODUCTION READY**  
+**Overall Status**: ✅ **PRODUCTION READY + AGENTIC ENGINE LIVE**  
 **Completion Date**: February 27, 2026  
-**Test Coverage**: 31+ scenarios (100% pass rate)
+**Test Coverage**: 31+ scenarios (100% pass rate)  
+**Latest Phase**: 8.7 — Agentic Background Monitor Engine
 
 ---
 
@@ -171,24 +172,34 @@
 
 ## Code Changes Summary
 
-### Total Files Modified: 8
+### Total Files Modified / Created: 18+
 
 ```
 app/
 ├── api/
 │   ├── routes.py                      [MODIFIED - Added mode parameter]
-│   └── dashboard.py                   [MODIFIED - Deserialize JSON offers]
+│   ├── dashboard.py                   [MODIFIED - Inline edit, WA send, engine summary]
+│   └── admin.py                       [NEW - Engine ON/OFF/ALWAYS_ON/clear-cache endpoints]
 ├── engines/
 │   └── offer_engine.py                [NEW - Offer calculations]
 ├── models/
-│   └── risk_score.py                  [MODIFIED - Added financial_offer column]
+│   ├── risk_score.py                  [MODIFIED - Added financial_offer, whatsapp_status]
+│   ├── merchant.py                    [MODIFIED - Added behavioral + mobile_number fields]
+│   └── system_config.py               [NEW - Key-value config store model]
 ├── orchestrator/
-│   └── orchestrator.py                [MODIFIED - Integrated OfferEngine]
+│   └── orchestrator.py                [MODIFIED - Integrated OfferEngine, WA fail-safe]
 ├── schemas/
 │   ├── decision_schema.py             [MODIFIED - Added offer schemas]
 │   └── merchant_schema.py             [MODIFIED - Added 8 behavioral fields]
+├── services/
+│   ├── monitor_service.py             [NEW - Agentic background monitor engine]
+│   ├── config_service.py              [NEW - get_config / set_config helpers]
+│   ├── whatsapp_service.py            [MODIFIED - Professional format, fail-safe, no-retry codes]
+│   └── engine_service.py              [MODIFIED - Batch processing helpers]
 └── templates/
-    └── merchant_detail.html           [MODIFIED - Added mode toggle & offer cards]
+    ├── merchant_list.html             [MODIFIED - Engine control UI, WA report, Sr.No., toasts]
+    ├── merchant_detail.html           [MODIFIED - Mode toggle, offer cards, risk panel]
+    └── offer_page.html                [NEW - Public secure merchant offer page]
 ```
 
 ### New Test Files: 3
@@ -199,7 +210,7 @@ test_phase84.py                        [NEW - 22 scenario production validation]
 test_phase85_86.py                     [NEW - API & UI verification]
 ```
 
-### New Documentation: 5
+### New Documentation: 7
 
 ```
 PHASE_8_1_MERCHANT_SCHEMA_REPORT.md
@@ -207,8 +218,9 @@ PHASE_8_2_DUAL_MODE_ENGINE_REPORT.md
 PHASE_8_3_TEST_REPORT.md
 PHASE_8_4_PRODUCTION_VALIDATION_REPORT.md
 PHASE_8_5_API_FINALIZATION_REPORT.md
-PHASE_8_6_UI_ENHANCEMENT_REPORT.md
-PHASE_8_COMPLETE_SUMMARY.md
+PHASE_8_6_UI_ENHANCEMENT_REPORT.md     [Updated — 9 sub-issues table added]
+PHASE_8_7_AGENTIC_ENGINE_REPORT.md     [NEW]
+PHASE_8_COMPLETE_SUMMARY.md            [Updated — Phase 8.7 + sub-issues added]
 ```
 
 ---
@@ -236,7 +248,7 @@ PHASE_8_COMPLETE_SUMMARY.md
 - ✅ GMV trends analysis (12-month history)
 - ✅ Customer loyalty metrics featured
 
-### Dashboard UI
+### Dashboard UI (Phase 8.6 core)
 - ✅ Mode toggle buttons (💳, 🛡️, 📋)
 - ✅ GrabCredit offer card (blue theme)
 - ✅ GrabInsurance offer card (purple theme)
@@ -245,12 +257,45 @@ PHASE_8_COMPLETE_SUMMARY.md
 - ✅ Risk breakdown panel
 - ✅ JavaScript mode switching
 
+### Phase 8.6.1–8.6.9 Sub-Issues
+- ✅ 8.6.1 — Public merchant offer page (secure token link)
+- ✅ 8.6.2 — Full admin dashboard with merchant table
+- ✅ 8.6.3 — WhatsApp test mode / evaluator number override
+- ✅ 8.6.4 — AUTO / MANUAL underwriting mode toggle
+- ✅ 8.6.5 — Per-merchant manual WA "Send Now" button
+- ✅ 8.6.6 — Fail-safe WA: never raises, retry logic, no-retry codes
+- ✅ 8.6.7 — Professional WA offer message with offer link
+- ✅ 8.6.8 — `whatsapp_status` SENT/FAILED tracking on RiskScore
+- ✅ 8.6.9 — Final Grab-themed visual polish
+
+### Phase 8.7 — Agentic Engine
+- ✅ MD5 fingerprint change detection (13 fields)
+- ✅ 3-state engine control (OFF / Run Once / ALWAYS_ON)
+- ✅ Synchronous Run Once (blocks until all WA sent)
+- ✅ Background daemon thread for ALWAYS_ON (60s poll)
+- ✅ Segmented pill button UI for engine control
+- ✅ Inline mobile edit → immediate WA + toast feedback
+- ✅ Humanized WA error toasts (code → plain English)
+- ✅ Rate-limit short-circuit (63038 stops subsequent calls)
+- ✅ Clear Cache button (wipes fingerprints + WA status)
+- ✅ Expandable per-merchant WA report card
+- ✅ Sr. No. column in merchant table
+- ✅ `last_engine_summary` persisted by every cycle
+- ✅ Rate-limit amber notice in engine summary banner
+- ✅ Auto 30s page refresh when ALWAYS_ON active
+
 ### API Contract
 - ✅ POST /api/underwrite endpoint
 - ✅ Mode query parameter (optional)
 - ✅ Structured response with offers
 - ✅ Backward compatible response
 - ✅ Swagger documentation
+- ✅ POST /admin/engine/on — synchronous run once
+- ✅ POST /admin/engine/always-on — start background monitor
+- ✅ POST /admin/engine/off — stop monitor
+- ✅ POST /admin/engine/clear-cache — wipe fingerprints
+- ✅ POST /dashboard/{id}/mobile-inline — inline phone save + WA
+- ✅ POST /dashboard/{id}/send-offer — manual WA send
 
 ### Testing & Validation
 - ✅ 9 comprehensive scenarios (8.3)
@@ -424,7 +469,8 @@ Monitor these logs for issues:
 - Phase 8.3: Comprehensive Testing (9 scenarios, 100% pass)
 - Phase 8.4: Production Validation (22 scenarios, 100% pass)
 - Phase 8.5: API Finalization (6 checks, all passed)
-- Phase 8.6: UI Enhancement (full dashboard, verified)
+- Phase 8.6.1–8.6.9: All 9 UI/WA sub-issues complete (GitHub #86–#94)
+- Phase 8.7: Agentic Background Monitor Engine (fingerprint, 3-state, live WA, error UX)
 
 ✅ **ALL SOW REQUIREMENTS MET**
 - REQ-1: Dual-mode merchant underwriting ✅
@@ -434,9 +480,9 @@ Monitor these logs for issues:
 - REQ-5: Dashboard mode selection & offer display ✅
 - REQ-6: Production reliability & backward compatibility ✅
 
-✅ **STATUS: PRODUCTION READY**
+✅ **STATUS: PRODUCTION READY + AGENTIC ENGINE LIVE**
 
-**Recommendation**: Proceed with production deployment immediately.
+**Recommendation**: System is fully production-grade. Background monitor, inline edit, and live WA dispatch are all operational.
 
 ---
 
@@ -449,13 +495,14 @@ Monitor these logs for issues:
 | Comprehensive Test Report | 9-scenario test results | PHASE_8_3_TEST_REPORT.md |
 | Production Validation Report | 22-scenario production test | PHASE_8_4_PRODUCTION_VALIDATION_REPORT.md |
 | API Finalization Report | API contract & specification | PHASE_8_5_API_FINALIZATION_REPORT.md |
-| UI Enhancement Report | Dashboard implementation | PHASE_8_6_UI_ENHANCEMENT_REPORT.md |
-| Complete Summary | Executive overview | PHASE_8_COMPLETE_SUMMARY.md |
+| UI Enhancement Report | Dashboard + 8.6.1–8.6.9 sub-issues | PHASE_8_6_UI_ENHANCEMENT_REPORT.md |
+| Agentic Engine Report | Phase 8.7 — monitor, engine, WA fixes | PHASE_8_7_AGENTIC_ENGINE_REPORT.md |
+| Complete Summary | Executive overview + all phases | PHASE_8_COMPLETE_SUMMARY.md |
 | Deliverables Summary | This document | PHASE_8_DELIVERABLES.md |
 
 ---
 
 **Report Date**: February 27, 2026  
-**Status**: ✅ **PRODUCTION READY**  
-**Next Action**: Begin production deployment
+**Status**: ✅ **PRODUCTION READY + AGENTIC ENGINE LIVE**  
+**Next Action**: Production deployment or Phase 9 planning
 

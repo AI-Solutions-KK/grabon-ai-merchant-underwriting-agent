@@ -103,6 +103,7 @@ class WhatsAppService:
         63007: "Recipient has not joined the WhatsApp sandbox — ask them to send the join code first",
         63016: "Message blocked by WhatsApp — content policy violation",
         63032: "WhatsApp template must be used for first message to this user",
+        63038: "Twilio sandbox/account daily message limit (50/day) exceeded — wait until midnight UTC or upgrade your Twilio plan",
     }
 
     def send_message(

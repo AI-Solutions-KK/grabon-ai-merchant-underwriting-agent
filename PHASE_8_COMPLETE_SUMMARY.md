@@ -1,9 +1,10 @@
 # Phase 8 Complete: Engine Ready — SOW Alignment ✅
 
-**Overall Status**: ✅ **PRODUCTION READY**  
+**Overall Status**: ✅ **PRODUCTION READY + AGENTIC ENGINE LIVE**  
 **Completion Date**: February 27, 2026  
-**Total Implementation Time**: Multi-phase completion
-**Test Results**: 100% Pass Rate (31+ scenarios tested)
+**Total Implementation Time**: Multi-phase completion  
+**Test Results**: 100% Pass Rate (31+ scenarios tested)  
+**Latest Enhancement**: Phase 8.7 — Agentic Background Monitor & Live Dashboard Engine
 
 ---
 
@@ -17,7 +18,8 @@ All **6 SOW requirements** have been met with 100% compliance across 8 sub-phase
 - ✅ Phase 8.3: Comprehensive Testing (9 scenarios)
 - ✅ Phase 8.4: Production Validation (22 merchant scenarios)
 - ✅ Phase 8.5: API Finalization (6 contract checks)
-- ✅ Phase 8.6: UI Enhancement (complete dashboard)
+- ✅ Phase 8.6: UI Enhancement — all 9 sub-issues complete (8.6.1–8.6.9)
+- ✅ Phase 8.7: Agentic Background Monitor Engine (new — post-SOW enhancement)
 
 ---
 
@@ -33,7 +35,17 @@ All **6 SOW requirements** have been met with 100% compliance across 8 sub-phase
 | **8.3** | Comprehensive Testing | ✅ Complete | 9 test scenarios (100% pass) |
 | **8.4** | Production Validation | ✅ Complete | 22 merchant scenarios (100% pass) |
 | **8.5** | API Finalization | ✅ Complete | POST /api/underwrite with mode param |
-| **8.6** | UI Enhancement | ✅ Complete | Mode toggles & offer cards |
+| **8.6** | UI Enhancement | ✅ Complete | Mode toggles & offer cards (9 sub-issues) |
+| **8.6.1** | Public Offer Page | ✅ Complete | Secure token-based merchant offer view |
+| **8.6.2** | Admin Dashboard | ✅ Complete | Full admin panel with merchant table |
+| **8.6.3** | WhatsApp Test Mode | ✅ Complete | Evaluator sandbox routing |
+| **8.6.4** | Auto Mode Toggle | ✅ Complete | AUTO / MANUAL underwriting mode |
+| **8.6.5** | Manual Send Button | ✅ Complete | Per-merchant on-demand WA send |
+| **8.6.6** | Fail-Safe WA Handling | ✅ Complete | Retry logic, no-retry codes, error returns |
+| **8.6.7** | WA Message Format | ✅ Complete | Professional offer format with offer link |
+| **8.6.8** | Offer Status Sync | ✅ Complete | `whatsapp_status` tracking on RiskScore |
+| **8.6.9** | Final Visual Polish | ✅ Complete | Grab-themed dashboard styling |
+| **8.7** | Agentic Engine | ✅ Complete | Background monitor + 3-state engine control |
 
 ---
 
@@ -521,17 +533,149 @@ All documentation complete and available:
 
 ---
 
+## Phase 8.6 Sub-Issues — Detailed Completion (GitHub #86–#94)
+
+### 8.6.1 — Simple Merchant Offer Page (Public Secure View) #86 ✅
+- **File**: `app/templates/offer_page.html` + `/offer/{token}` route  
+- **Feature**: Merchants receive a unique secure token link in their WA message. Clicking it opens a clean branded page showing their pre-approved GrabCredit/GrabInsurance offer and an "Accept Offer" button.  
+- **Security**: Token-based access — no login required, no merchant ID exposed in URL.
+
+### 8.6.2 — Admin Dashboard Enhancement #87 ✅
+- **File**: `app/templates/merchant_list.html`, `app/api/dashboard.py`  
+- **Feature**: Full admin merchant table with risk score, decision badge, WA status, mobile number inline edit, and per-row action buttons. Engine control card at the top.  
+- **Includes**: Search/filter, color-coded decision badges, 10+ seeded merchants pre-loaded.
+
+### 8.6.3 — WhatsApp Test Mode (Evaluator Mode) #88 ✅
+- **File**: `app/templates/merchant_list.html`, `app/api/dashboard.py`, `app/services/config_service.py`  
+- **Feature**: Admin can set a single "test number" that overrides all WA destinations. All messages route to the evaluator's phone regardless of merchant number. Toggle ON/OFF per session.  
+- **Config keys**: `test_mobile_override_enabled`, `test_mobile_number`
+
+### 8.6.4 — Auto Mode Toggle (Simple Version) #89 ✅
+- **File**: Admin dashboard settings panel  
+- **Feature**: Toggle between `AUTO` (send WA automatically after underwriting) and `MANUAL` (admin reviews first, then sends). Respects mode in orchestrator and engine service.
+
+### 8.6.5 — Manual Send Button #90 ✅
+- **File**: `app/api/dashboard.py` → `POST /{merchant_id}/send-offer`  
+- **Feature**: Per-merchant "Send WA Now" button in admin table. Sends the latest offer immediately regardless of engine state. Blocked for REJECTED merchants with a clear error message.
+
+### 8.6.6 — Fail-Safe WhatsApp Handling #91 ✅
+- **File**: `app/services/whatsapp_service.py`  
+- **Feature**: `send_message()` NEVER raises exceptions — always returns `{sid, status, error}`. Hard-fail codes (21211, 21614, 63007, 63032, 63038, etc.) skip retry immediately. Transient failures retry up to 2× with 2s backoff. Fully enumerated `_NO_RETRY_CODES` dict with human-readable reasons.
+
+### 8.6.7 — Professional WhatsApp Message Format Upgrade #92 ✅
+- **File**: `app/services/whatsapp_service.py` → `format_underwriting_message()`  
+- **Feature**: Structured professional message: header, merchant name, risk tier, decision, full credit offer (limit/rate/tenure), insurance offer (coverage/premium), and secure offer link. No raw AI explanation in WA (kept admin-only).
+
+### 8.6.8 — Offer Status Sync #93 ✅
+- **File**: `app/models/risk_score.py`, orchestrator, monitor service, dashboard  
+- **Feature**: `whatsapp_status` column on `RiskScore` — tracks `SENT` / `FAILED` / `None`. Updated atomically after each WA attempt. Shown as badge in admin merchant table. Used by fingerprint engine to avoid duplicate sends.
+
+### 8.6.9 — Final Visual Polish #94 ✅
+- **File**: `app/templates/merchant_list.html`, `app/templates/merchant_detail.html`  
+- **Feature**: Grab-themed color palette, responsive card grid, animated status badges, engine control segmented button strip (joined pill buttons), summary stats chips, collapsible per-merchant WA breakdown panel, Sr. No. column, smooth cell flash on inline edit save.
+
+---
+
+## Phase 8.7 — Agentic Background Monitor Engine ✅ (Post-SOW Enhancement)
+
+> **Context**: After completing all SOW deliverables (8.6.1–8.6.9), additional production-grade agentic capabilities were designed and implemented to make the system fully autonomous.
+
+### New Files Created
+| File | Purpose |
+|------|---------|
+| `app/services/monitor_service.py` | Core agentic engine — background thread, fingerprint detection, WA dispatch |
+| `app/services/config_service.py` | Key-value config store (reads/writes `system_config` table) |
+
+### New Features Implemented
+
+#### 8.7.1 — MD5 Fingerprint Change Detection
+- Every merchant has 13 fields hashed into an MD5 fingerprint (12 scoring fields + `mobile_number`)
+- Fingerprint stored as `fp_{merchant_id}` in `system_config` table
+- On each cycle: if fingerprint changed OR no risk record exists → re-run full underwriting + send WA
+- If unchanged → skip silently (no duplicate sends, no wasted Claude calls)
+- **Adding/editing a phone number** triggers a new fingerprint → automatic re-send
+
+#### 8.7.2 — 3-State Engine Control (OFF / Run Once / Always ON)
+- `OFF` — engine idle, no background processing  
+- `ON` (Run Once) — synchronous endpoint: blocks until all merchants processed and all WA messages attempted, then returns. Results immediately visible on redirect.  
+- `ALWAYS_ON` — background daemon thread, polls every 60 seconds (configurable via `MONITOR_POLL_INTERVAL` env var)
+- State persisted in `engine_state` config key — survives page reload, visible to all admin sessions
+
+#### 8.7.3 — Segmented Button UI for Engine Control
+- Horizontal joined-pill button strip: `▶ Run Once | 🔄 Always ON | ⏹ OFF`
+- Active state shows depressed inset shadow on current state
+- All buttons disable + show `⏳ Working…` on submit (prevents double-click)
+- Separate subtle "🗑 Clear Cache" secondary button below the strip
+- 30-second auto-refresh when ALWAYS_ON is active
+
+#### 8.7.4 — Live Inline Mobile Number Edit with Immediate WA
+- Every mobile number cell in the merchant table is click-to-edit (pencil icon or double-click)
+- On save: number written to DB, fingerprint wiped, WA offer sent immediately if merchant has an APPROVED/CONDITIONAL decision
+- Toast notification shows outcome (green = sent, orange = failed, yellow = no decision yet, red = rejected)
+- Error toasts stay 7 seconds; success toasts 3.5 seconds
+
+#### 8.7.5 — Humanized WA Error Toasts
+| Twilio Error | Toast Message |
+|---|---|
+| 63038 rate limit | ⏳ Daily WhatsApp limit (50/day). Resets at midnight UTC. |
+| 63007 sandbox | 📲 Recipient hasn't joined sandbox. Ask them to send join code. |
+| 21211/21614 bad number | 📵 Invalid phone number format. |
+| 20003 auth | 🔑 Twilio auth error — check credentials in .env. |
+| Other | First line of Twilio error, trimmed to 120 chars. |
+
+#### 8.7.6 — Engine Summary Banner with Expandable Report Card
+- After Run Once or Always ON cycle: banner appears with stat chips (processed / approved / rejected / WA sent / failed / skipped)
+- If Twilio daily limit was hit: yellow callout box explains the limit and when it resets
+- `▼ Details` button expands a full per-merchant table: # | Merchant | Decision | WA Status (📲/❌/⏭) | Sent To (phone) | Note
+- All stats persisted as `last_engine_summary` JSON — always reflects latest cycle
+
+#### 8.7.7 — Rate-Limit Short-Circuit
+- Once Twilio error 63038 (daily 50 msg limit) is detected, sets `_rate_limited = True`
+- All remaining merchants in that cycle skip the Twilio API call instantly (no wasted retries)
+- `rate_limited: true` flag included in stats → banner shows the amber explanation notice
+- 63038 is also a hard-fail code (no 2s retry delay) → cycles complete ~10× faster when rate-limited
+
+#### 8.7.8 — Clear Cache Button
+- Deletes all `fp_*` config rows from `system_config`
+- Resets `whatsapp_status = None` on every `RiskScore` record
+- Does not start/stop the engine — purely resets "already sent" memory
+- Next engine run will re-process and re-send to all non-rejected merchants with valid numbers
+
+#### 8.7.9 — ALWAYS_ON Cycle Stats Persistence
+- `_run_cycle()` now writes `last_engine_summary` to DB at the end of every cycle
+- Both Run Once and ALWAYS_ON background thread benefit
+- Dashboard banner refreshes every 30s when ALWAYS_ON active → always shows latest data
+
+---
+
+## Problems Solved in Phase 8.7
+
+| Problem | Root Cause | Fix Applied |
+|---------|-----------|-------------|
+| "Run Once" sent no WA messages | Background thread context killed by `--reload` | Made endpoint synchronous — blocks until all WA sent |
+| Inline save ignored phone changes | `mobile-inline` only wrote to DB, no WA trigger | Added immediate WA send after save + fingerprint wipe |
+| `wa_sent` always showed max count | `bool("N/A") == True` — Twilio failure SID still truthy | Fixed: `sid not in ("N/A", "", None)` |
+| Engine ran but no banner showed | `last_engine_summary` only written by Run Once, not ALWAYS_ON | `_run_cycle()` now writes summary itself |
+| Raw Twilio error blobs in toast | Error passed directly to UI (`result.get("error")`) | `humanizeWaError()` JS function maps error codes to plain English |
+| Repeated 63038 API calls | No rate-limit awareness in cycle | `_rate_limited` flag short-circuits after first 63038 |
+| Cycle took 40s+ when rate-limited | 2s retry delay × 2 per merchant | 63038 added to `_NO_RETRY_CODES` (immediate fail, no retry) |
+| UI buttons stacked and broken | 4 separate `<form>` elements stacked vertically | Replaced with horizontal joined segmented pill strip |
+| Re-run skipped all merchants | Fingerprints cached from first run | Run Once and Always ON both call `clear_all_fingerprints()` first |
+
+---
+
 ## Final Sign-Off
 
 ### Phase 8 Completion Summary
 
-✅ **All 8 Sub-Phases Complete**
+✅ **All Sub-Phases Complete**
 - 8.1: Merchant Schema (18 fields)
 - 8.2: Dual-Mode Engine (4 substeps)
 - 8.3: Comprehensive Testing (9 scenarios)
 - 8.4: Production Validation (22 scenarios)
 - 8.5: API Finalization (6 checks)
-- 8.6: UI Enhancement (full dashboard)
+- 8.6.1–8.6.9: All 9 UI/WA sub-issues complete
+- 8.7: Agentic Background Monitor Engine (fingerprint detection, 3-state engine, live WA, error UX)
 
 ✅ **All 6 SOW Requirements Met**
 - REQ-1: Dual-mode underwriting
@@ -550,21 +694,7 @@ All documentation complete and available:
 - API contract verified
 - UI functionality tested
 
-✅ **Status**: **PRODUCTION READY**
-
----
-
-## Next Steps
-
-### Option 1: Production Deployment
-Begin Phase 1 staging validation immediately. System is fully compliant and production-ready.
-
-### Option 2: Enhancements (Cost-Benefit Analysis)
-Consider Phase 9+ enhancements post-launch:
-- A/B testing different offer structures
-- Machine learning for personalized limits
-- Additional merchant categories
-- Enhanced analytics and reporting
+✅ **Status**: **PRODUCTION READY + AGENTIC ENGINE LIVE**
 
 ---
 

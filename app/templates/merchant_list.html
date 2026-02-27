@@ -271,10 +271,17 @@
 
         <!-- Engine Summary Banner -->
         {% if engine_summary %}
-        <div class="engine-summary">
+        <div class="engine-summary" id="engine-summary-bar">
             <div class="summary-icon">✅</div>
-            <div>
-                <div class="summary-title">Engine Run Complete</div>
+            <div style="flex:1;">
+                <div class="summary-title">Engine Run Complete
+                    {% if engine_summary.details %}
+                    <button onclick="toggleEngineDetail()" id="btn-detail-toggle"
+                        style="margin-left:0.75rem;background:none;border:1px solid #27ae60;color:#0d5e33;border-radius:12px;padding:0.15rem 0.65rem;font-size:0.72rem;font-weight:700;cursor:pointer;">
+                        ▼ Details
+                    </button>
+                    {% endif %}
+                </div>
                 <div class="summary-stats">
                     <span class="stat-chip">📋 {{ engine_summary.processed }} processed</span>
                     <span class="stat-chip ok">✅ {{ engine_summary.approved }} approved</span>
@@ -287,8 +294,84 @@
                     <span class="stat-chip">⏭ {{ engine_summary.wa_skipped }} WA skipped</span>
                     {% endif %}
                 </div>
+                {% if engine_summary.rate_limited %}
+                <div style="margin-top:0.55rem;padding:0.45rem 0.8rem;background:#fff8e1;border:1px solid #f9a825;border-radius:8px;font-size:0.82rem;color:#7a5200;line-height:1.45;">
+                    ⏳ <strong>WhatsApp daily limit reached (50 msg/day on Twilio sandbox).</strong>
+                    Messages were <em>not</em> delivered. The limit resets automatically at <strong>midnight UTC</strong>.
+                    Run the engine again tomorrow or upgrade your Twilio plan to send more messages.
+                </div>
+                {% elif engine_summary.wa_failed > 0 %}
+                <div style="margin-top:0.55rem;padding:0.45rem 0.8rem;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:0.82rem;color:#7a5200;line-height:1.45;">
+                    ⚠ Some WhatsApp messages failed. Click <strong>▼ Details</strong> above to see per-merchant reasons.
+                </div>
+                {% endif %}
             </div>
         </div>
+
+        <!-- Expandable per-merchant breakdown -->
+        {% if engine_summary.details %}
+        <div id="engine-detail-panel" style="display:none;background:white;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.08);overflow:hidden;margin-bottom:1.5rem;">
+            <div style="padding:0.7rem 1.25rem;background:#f7f8fa;border-bottom:1px solid #e8eaed;display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:0.7rem;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#7f8c8d;">Last Run — Per-Merchant WhatsApp Breakdown</span>
+                <button onclick="toggleEngineDetail()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:#aaa;line-height:1;">×</button>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                <thead>
+                    <tr style="background:#f7f8fa;">
+                        <th style="padding:0.55rem 1rem;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7f8c8d;border-bottom:2px solid #e8eaed;text-align:left;">#</th>
+                        <th style="padding:0.55rem 1rem;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7f8c8d;border-bottom:2px solid #e8eaed;text-align:left;">Merchant</th>
+                        <th style="padding:0.55rem 1rem;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7f8c8d;border-bottom:2px solid #e8eaed;text-align:left;">Decision</th>
+                        <th style="padding:0.55rem 1rem;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7f8c8d;border-bottom:2px solid #e8eaed;text-align:left;">WA Status</th>
+                        <th style="padding:0.55rem 1rem;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7f8c8d;border-bottom:2px solid #e8eaed;text-align:left;">Sent To</th>
+                        <th style="padding:0.55rem 1rem;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7f8c8d;border-bottom:2px solid #e8eaed;text-align:left;">Note</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for d in engine_summary.details %}
+                <tr style="border-bottom:1px solid #f0f2f5;{% if loop.index is even %}background:#fafbff;{% endif %}">
+                    <td style="padding:0.5rem 1rem;color:#bbb;font-size:0.78rem;">{{ loop.index }}</td>
+                    <td style="padding:0.5rem 1rem;">
+                        <strong>{{ d.merchant_id }}</strong>
+                        {% if d.name and d.name != d.merchant_id %}<br><span style="color:#999;font-size:0.76rem;">{{ d.name }}</span>{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;">
+                        {% if d.decision == 'APPROVED' %}<span style="color:#0d6e3b;font-weight:700;">✓ Approved</span>
+                        {% elif 'CONDITIONS' in d.decision %}<span style="color:#856404;font-weight:700;">~ Conditional</span>
+                        {% elif d.decision == 'REJECTED' %}<span style="color:#922020;font-weight:700;">✗ Rejected</span>
+                        {% else %}<span style="color:#888;">{{ d.decision }}</span>{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;">
+                        {% if d.wa == 'sent' %}
+                          <span style="background:#e8f0fe;color:#1a56db;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.76rem;font-weight:700;">📲 Sent</span>
+                        {% elif d.wa == 'failed' %}
+                          <span style="background:#fde8e8;color:#922020;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.76rem;font-weight:700;">❌ Failed</span>
+                        {% elif d.wa == 'skipped' %}
+                          <span style="background:#f0f2f5;color:#7f8c8d;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.76rem;font-weight:600;">⏭ Skipped</span>
+                        {% else %}<span style="color:#aaa;">—</span>{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;font-family:monospace;font-size:0.82rem;color:#555;">{{ d.number or '—' }}</td>
+                    <td style="padding:0.5rem 1rem;font-size:0.78rem;color:#888;">{{ d.reason or '' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <script>
+        function toggleEngineDetail() {
+            var panel = document.getElementById('engine-detail-panel');
+            var btn   = document.getElementById('btn-detail-toggle');
+            if (!panel) return;
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.textContent = '▲ Details';
+                panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+            } else {
+                panel.style.display = 'none';
+                btn.textContent = '▼ Details';
+            }
+        }
+        </script>
+        {% endif %}
         {% endif %}
 
         <!-- Merchant Table -->
@@ -298,6 +381,7 @@
             <table class="table">
                 <thead>
                     <tr>
+                        <th style="width:40px;">#</th>
                         <th>Merchant ID</th>
                         <th>Category</th>
                         <th>Revenue / mo</th>
@@ -315,6 +399,7 @@
                     {% set m = item.merchant %}
                     {% set rs = item.risk_score %}
                     <tr>
+                        <td style="color:#aaa;font-size:0.78rem;font-weight:600;">{{ loop.index }}</td>
                         <td><strong style="color:#1a2035;">{{ m.merchant_id }}</strong></td>
                         <td style="color:#555;">{{ m.category or '—' }}</td>
                         <td>₹{{ "{:,}".format(m.monthly_revenue|int) }}</td>
@@ -486,6 +571,22 @@
 
         cancelBtn.addEventListener('click', () => showDisplay());
 
+        function humanizeWaError(err) {
+            if (!err) return 'Unknown error';
+            const s = String(err);
+            if (s.includes('63038') || s.toLowerCase().includes('daily messages limit') || s.toLowerCase().includes('exceeded'))
+                return '⏳ Daily WhatsApp limit reached (50 msg/day on Twilio sandbox). Resets at midnight UTC — try again tomorrow.';
+            if (s.includes('63007') || s.toLowerCase().includes('not joined') || s.toLowerCase().includes('join code'))
+                return '📲 Recipient has not joined the Twilio WhatsApp sandbox. Ask them to send the join message first.';
+            if (s.includes('21211') || s.includes('21614') || s.toLowerCase().includes('invalid') || s.toLowerCase().includes('not a valid mobile'))
+                return '📵 Invalid phone number format. Check the number is correct (e.g. +91XXXXXXXXXX).';
+            if (s.includes('20003') || s.toLowerCase().includes('auth'))
+                return '🔑 Twilio authentication error — check TWILIO_ACCOUNT_SID / AUTH_TOKEN in .env.';
+            // Trim long raw Twilio stack to first sentence
+            const firstLine = s.split('\n')[0].replace(/^HTTP Error.*?\n/i, '').trim();
+            return firstLine.length > 120 ? firstLine.substring(0, 117) + '…' : firstLine;
+        }
+
         async function doSave() {
             const num = input.value.trim();
             if (!num) { alert('Please enter a valid number (e.g. +91XXXXXXXXXX)'); return; }
@@ -518,10 +619,10 @@
                         title   = '💾 Number saved. Merchant is REJECTED — no WA sent.';
                     } else if (data.wa_status === 'bad_number') {
                         bgColor = '#fff3cd';
-                        title   = `⚠ Number saved but format invalid for WA: ${data.wa_error}`;
+                        title   = `⚠ Number saved but format invalid for WA: ${humanizeWaError(data.wa_error)}`;
                     } else if (data.wa_status === 'failed' || data.wa_status === 'error') {
                         bgColor = '#fff3cd';
-                        title   = `⚠ Number saved but WA failed: ${data.wa_error || ''}`;
+                        title   = `⚠ Number saved but WA failed: ${humanizeWaError(data.wa_error)}`;
                     } else {
                         bgColor = '#d4f8e8';
                         title   = '✅ Number saved.';
@@ -544,11 +645,15 @@
                         document.body.appendChild(toast);
                     }
                     toast.textContent = title;
-                    toast.style.background = data.wa_sent ? '#27ae60' : '#f39c12';
+                    toast.style.background = data.wa_sent ? '#27ae60' : (data.wa_status === 'rejected' ? '#c0392b' : '#e67e22');
                     toast.style.color = 'white';
                     toast.style.opacity = '1';
+                    toast.style.maxWidth = '400px';
+                    toast.style.lineHeight = '1.4';
                     clearTimeout(toast._hide);
-                    toast._hide = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+                    // Errors stay 7s, success fades after 3.5s
+                    const hideDelay = data.wa_sent ? 3500 : 7000;
+                    toast._hide = setTimeout(() => { toast.style.opacity = '0'; }, hideDelay);
                 } else {
                     alert('Save failed: ' + (data.error || 'Unknown error'));
                     showDisplay();
