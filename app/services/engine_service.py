@@ -3,19 +3,28 @@ Batch Underwriting Engine Service
 
 Processes up to 10 merchants in a single engine run.
 Called by POST /admin/run-engine (button-triggered, not scheduled).
+
+WA sending logic:
+  - Engine run = explicit admin action → ALWAYS sends to approved merchants
+    regardless of AUTO/MANUAL mode setting.
+  - AUTO/MANUAL mode only governs API-triggered (per-merchant) flows.
+  - REJECTED merchants never receive a WhatsApp message.
+  - Test-override routes all sends to the override number when enabled.
 """
 
-import logging
 import json
+import logging
+import os
 from typing import Dict
+
 from sqlalchemy.orm import Session
 
 from app.models.merchant import Merchant
 from app.models.risk_score import RiskScore
-from app.schemas.merchant_schema import MerchantInput
 from app.orchestrator.orchestrator import Orchestrator
+from app.schemas.merchant_schema import MerchantInput
 from app.services.config_service import get_config, set_config
-from app.services.whatsapp_service import normalize_wa_number
+from app.services.whatsapp_service import WhatsAppService, normalize_wa_number
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +58,6 @@ class EngineService:
               "details": [{"merchant_id", "decision", "tier", "wa_status"}, ...]
             }
         """
-        auto_mode = get_config(db, "underwriting_mode", "AUTO") == "AUTO"
         merchants = db.query(Merchant).limit(10).all()
 
         stats = {
@@ -72,7 +80,7 @@ class EngineService:
             }
 
             try:
-                # Build MerchantInput from stored merchant row
+                # Build MerchantInput fresh from current DB row — always uses latest data
                 merchant_input = MerchantInput(
                     merchant_id=merchant.merchant_id,
                     category=merchant.category or "General",
@@ -93,26 +101,12 @@ class EngineService:
                     return_and_refund_rate=merchant.return_and_refund_rate or 0.0,
                 )
 
-                # Determine WhatsApp number (AUTO mode)
-                # Priority: test_override number > merchant's own number
-                wa_number = None
-                if auto_mode:
-                    test_override = get_config(db, "test_mobile_override_enabled", "false")
-                    test_num = get_config(db, "test_mobile_number", "")
-                    if test_override == "true" and test_num:
-                        # Test mode: route ALL auto-sends to the override number
-                        wa_number = normalize_wa_number(test_num)
-                        logger.info(f"[Engine] TestMode override → sending WA for {merchant.merchant_id} to {test_num}")
-                    elif merchant.mobile_number:
-                        wa_number = normalize_wa_number(merchant.mobile_number)
-                        if not wa_number:
-                            logger.warning(f"[Engine] Invalid mobile '{merchant.mobile_number}' for {merchant.merchant_id} — skipping WA")
-
-                # Run underwriting (orchestrator handles WA send internally in AUTO)
+                # Pass whatsapp_number=None — engine handles WA itself below,
+                # so orchestrator's AUTO/MANUAL gate never blocks us.
                 decision = Orchestrator.process_underwriting(
                     merchant=merchant_input,
                     db=db,
-                    whatsapp_number=wa_number,
+                    whatsapp_number=None,
                     mode=None,
                 )
 
@@ -125,22 +119,87 @@ class EngineService:
                 else:
                     stats["rejected"] += 1
 
-                # Read WA status that orchestrator wrote
+                # ── Engine WA send: always fires for non-rejected, ignores AUTO/MANUAL ──
+                # Reads fresh config each iteration so changes take effect immediately.
                 saved_rs = db.query(RiskScore).filter(
                     RiskScore.merchant_id == merchant.merchant_id
                 ).order_by(RiskScore.id.desc()).first()
 
-                if saved_rs:
-                    wa_st = getattr(saved_rs, "whatsapp_status", "NOT_SENT")
-                    row_detail["wa_status"] = wa_st
-                    if wa_st == "SENT":
-                        stats["wa_sent"] += 1
-                    elif wa_st == "FAILED":
-                        stats["wa_failed"] += 1
+                if decision.decision != "REJECTED":
+                    # Resolve destination number (test-override takes priority)
+                    test_override = get_config(db, "test_mobile_override_enabled", "false")
+                    test_num = get_config(db, "test_mobile_number", "")
+
+                    if test_override == "true" and test_num:
+                        raw_dest = test_num
+                        logger.info(f"[Engine] TestMode → routing {merchant.merchant_id} WA to {raw_dest}")
                     else:
+                        raw_dest = merchant.mobile_number or ""
+
+                    to_number = normalize_wa_number(raw_dest) if raw_dest else ""
+
+                    if not to_number:
+                        logger.info(
+                            f"[Engine] No valid mobile for {merchant.merchant_id} "
+                            f"(mobile={merchant.mobile_number!r}) — skipping WA"
+                        )
+                        row_detail["wa_status"] = "SKIPPED"
                         stats["wa_skipped"] += 1
+                    else:
+                        try:
+                            # Build offer link from saved merchant's secure_token
+                            base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+                            offer_link = (
+                                f"{base_url}/offer/{merchant.secure_token}"
+                                if getattr(merchant, "secure_token", None)
+                                else ""
+                            )
+                            # Serialize financial offer for message formatter
+                            import json as _json
+                            fo_dict = {}
+                            if saved_rs and saved_rs.financial_offer:
+                                try:
+                                    fo_dict = _json.loads(saved_rs.financial_offer)
+                                except Exception:
+                                    fo_dict = {}
+
+                            wa_svc = WhatsAppService()
+                            result = wa_svc.send_underwriting_result(
+                                to_number=to_number,
+                                merchant_id=merchant.merchant_id,
+                                merchant_name=getattr(merchant, "business_name", "") or merchant.merchant_id,
+                                risk_tier=decision.risk_tier,
+                                decision=decision.decision,
+                                risk_score=saved_rs.risk_score if saved_rs else 0,
+                                explanation=saved_rs.explanation or "" if saved_rs else "",
+                                financial_offer=fo_dict,
+                                secure_offer_link=offer_link,
+                            )
+
+                            wa_status_val = result.get("status", "failed")
+                            is_sent = wa_status_val in ("queued", "sent", "delivered")
+
+                            if saved_rs:
+                                saved_rs.whatsapp_status = "SENT" if is_sent else "FAILED"
+                                db.commit()
+
+                            row_detail["wa_status"] = "SENT" if is_sent else "FAILED"
+                            if is_sent:
+                                stats["wa_sent"] += 1
+                                logger.info(f"[Engine] WA sent → {merchant.merchant_id} | to={to_number} | sid={result.get('sid')}")
+                            else:
+                                stats["wa_failed"] += 1
+                                logger.warning(f"[Engine] WA failed → {merchant.merchant_id} | {result.get('error')}")
+
+                        except Exception as wa_err:
+                            stats["wa_failed"] += 1
+                            row_detail["wa_status"] = "FAILED"
+                            logger.error(f"[Engine] WA exception for {merchant.merchant_id}: {wa_err}", exc_info=True)
                 else:
+                    # REJECTED — never send
+                    row_detail["wa_status"] = "NOT_SENT"
                     stats["wa_skipped"] += 1
+                    logger.info(f"[Engine] Skipping WA for {merchant.merchant_id} — REJECTED")
 
             except Exception as e:
                 stats["errors"] += 1

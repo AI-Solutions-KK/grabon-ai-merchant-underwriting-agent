@@ -101,9 +101,14 @@ class Orchestrator:
         
         # Step 8: Send WhatsApp notification (non-blocking, doesn't affect API response)
         # Skip if underwriting_mode is MANUAL — admin will send manually via dashboard
+        # Never send to REJECTED merchants — they have no offer to receive
         underwriting_mode = get_config(db, "underwriting_mode", "AUTO")
 
-        if whatsapp_number and underwriting_mode == "AUTO":
+        if decision == "REJECTED":
+            logger.info(
+                f"[WhatsApp] Skipping auto-send for {merchant.merchant_id} — decision is REJECTED (no offer)"
+            )
+        elif whatsapp_number and underwriting_mode == "AUTO":
             # Respect test-mode override
             test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
             test_mobile_number = get_config(db, "test_mobile_number", "")
@@ -160,8 +165,8 @@ class Orchestrator:
                         f"Failed to send WhatsApp notification for {merchant.merchant_id}: {e}",
                         exc_info=True
                     )
-        elif underwriting_mode == "MANUAL":
-            logger.info(f"Underwriting mode is MANUAL — skipping auto WhatsApp for {merchant.merchant_id}")
+        elif underwriting_mode == "MANUAL" and decision != "REJECTED":
+            logger.info(f"Underwriting mode is MANUAL — skipping auto WhatsApp for {merchant.merchant_id} (manual send available via dashboard)")
         
         # Step 9: Return decision
         return underwriting_decision

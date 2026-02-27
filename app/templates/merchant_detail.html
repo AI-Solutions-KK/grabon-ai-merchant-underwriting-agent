@@ -957,7 +957,8 @@
         </div>
         {% endif %}
 
-        <!-- ── WhatsApp Notification Card (always visible once assessed) ───── -->
+        <!-- ── WhatsApp Notification Card (only for approved merchants) ──────── -->
+        {% if risk_score.decision != 'REJECTED' %}
         <div class="card-section" style="border:2px solid #25D366;border-radius:10px;padding:1.25rem 1.5rem;">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
                 <div>
@@ -986,6 +987,17 @@
             </div>
             {% endif %}
         </div>
+        {% else %}
+        <div class="card-section" style="border:2px solid #e74c3c;border-radius:10px;padding:1rem 1.5rem;background:#fff5f5;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <span style="font-size:1.2rem;">🚫</span>
+                <div style="font-size:0.85rem;color:#721c24;">
+                    <strong>WhatsApp offer not sent</strong> — this merchant was <strong>REJECTED</strong> and has no pre-approved offer.
+                    No notification is delivered to rejected merchants.
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Footer -->
         <div class="footer-nav">

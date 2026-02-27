@@ -7,15 +7,51 @@ from app.api.routes import router
 from app.api.dashboard import router as dashboard_router
 from app.api.admin import router as admin_router
 from app.db.init_db import init_db
+import logging
 
-# Load environment variables from .env file
 load_dotenv()
+
+# Configure logging so monitor thread output appears in the server console
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+
+    # Restore ALWAYS_ON monitor if it was running before restart
+    try:
+        from app.db.session import SessionLocal
+        from app.services.config_service import get_config
+        from app.services import monitor_service
+        db = SessionLocal()
+        try:
+            state = get_config(db, "engine_state", "OFF")
+        finally:
+            db.close()
+
+        if state == "ALWAYS_ON":
+            logger.info("[Startup] engine_state=ALWAYS_ON — resuming background monitor")
+            monitor_service.start_monitor()
+        else:
+            logger.info(f"[Startup] engine_state={state} — monitor not auto-started")
+    except Exception as e:
+        logger.warning(f"[Startup] Could not check engine state: {e}")
+
     yield
+
+    # Graceful shutdown
+    try:
+        from app.services import monitor_service
+        monitor_service.stop_monitor()
+    except Exception:
+        pass
 
 
 app = FastAPI(

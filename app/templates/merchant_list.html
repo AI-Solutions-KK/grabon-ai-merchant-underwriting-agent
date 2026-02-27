@@ -167,20 +167,107 @@
     <div class="page-wrap">
 
         <!-- Engine Control Card -->
+        <style>
+            @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+            .engine-seg { display:flex; border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.10); }
+            .engine-seg form { margin:0; }
+            .engine-seg button {
+                border:none; padding:0.65rem 1.35rem; font-size:0.88rem; font-weight:700;
+                cursor:pointer; transition:filter 0.15s, transform 0.1s; white-space:nowrap;
+                border-right:1px solid rgba(255,255,255,0.18);
+            }
+            .engine-seg form:last-child button { border-right:none; }
+            .engine-seg button:hover:not(:disabled) { filter:brightness(1.1); transform:translateY(-1px); }
+            .engine-seg button:disabled { opacity:0.65; cursor:not-allowed; }
+            .seg-run    { background:linear-gradient(135deg,#f5a623,#ff7b2f); color:white; }
+            .seg-always { background:#27ae60; color:white; }
+            .seg-off    { background:#e74c3c; color:white; }
+            .seg-run.active    { background:linear-gradient(135deg,#c77d0a,#d45c10); box-shadow:inset 0 2px 6px rgba(0,0,0,0.20); }
+            .seg-always.active { background:#1e8449; box-shadow:inset 0 2px 6px rgba(0,0,0,0.20); }
+            .seg-off.active    { background:#c0392b; box-shadow:inset 0 2px 6px rgba(0,0,0,0.20); }
+        </style>
         <div class="engine-card">
             <div class="engine-card-left">
                 <h2>🚀 Underwriting Engine</h2>
                 <p>
-                    Process all {{ merchants_data|length }} merchants — generate risk decisions, financial offers,
-                    {% if underwriting_mode == 'AUTO' %}and auto-send WhatsApp offers.{% else %}and save decisions (WhatsApp send is manual per merchant).{% endif %}
+                    Process all {{ merchants_data|length }} merchants &mdash; risk scoring, AI decisions, WhatsApp offers.
                 </p>
+                <!-- Live state indicator -->
+                <div style="margin-top:0.55rem;">
+                {% if engine_state == 'ALWAYS_ON' and monitor_running %}
+                    <span style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.28rem 0.7rem;background:#d4edda;border-radius:20px;font-size:0.76rem;font-weight:700;color:#155724;">
+                        <span style="width:7px;height:7px;background:#27ae60;border-radius:50%;display:inline-block;animation:pulse 1.4s infinite;"></span>
+                        ALWAYS ON &mdash; auto-monitoring every 60s
+                    </span>
+                {% elif engine_state == 'ALWAYS_ON' %}
+                    <span style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.28rem 0.7rem;background:#d4edda;border-radius:20px;font-size:0.76rem;font-weight:700;color:#155724;">
+                        <span style="width:7px;height:7px;background:#27ae60;border-radius:50%;display:inline-block;animation:pulse 1.4s infinite;"></span>
+                        ALWAYS ON &mdash; starting&hellip;
+                    </span>
+                {% elif engine_state == 'ON' %}
+                    <span style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.28rem 0.7rem;background:#fff3cd;border-radius:20px;font-size:0.76rem;font-weight:700;color:#856404;">
+                        ⏳ Running batch&hellip;
+                    </span>
+                {% else %}
+                    <span style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.28rem 0.7rem;background:#f0f2f5;border-radius:20px;font-size:0.76rem;font-weight:600;color:#7f8c8d;">
+                        ⏹ Engine OFF
+                    </span>
+                {% endif %}
+                </div>
             </div>
-            <form method="POST" action="/admin/run-engine" style="margin:0;">
-                <button type="submit" class="btn-engine" onclick="this.textContent='⏳ Running…';this.disabled=true;">
-                    🚀 Start Underwriting Engine
-                </button>
-            </form>
+
+            <!-- Right: segmented control + clear cache -->
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.65rem;">
+                <div class="engine-seg" id="engine-seg">
+                    <!-- Run Once -->
+                    <form method="POST" action="/admin/engine/on">
+                        <button type="submit" class="seg-run {% if engine_state == 'ON' %}active{% endif %}"
+                            id="btn-run"
+                            title="Run underwriting for all merchants now, send WA to approved, then stop">
+                            ▶&nbsp;Run&nbsp;Once
+                        </button>
+                    </form>
+                    <!-- Always ON -->
+                    <form method="POST" action="/admin/engine/always-on">
+                        <button type="submit" class="seg-always {% if engine_state == 'ALWAYS_ON' %}active{% endif %}"
+                            title="Continuously monitor — re-sends WA whenever merchant data or phone number changes">
+                            🔄&nbsp;Always&nbsp;ON
+                        </button>
+                    </form>
+                    <!-- OFF -->
+                    <form method="POST" action="/admin/engine/off">
+                        <button type="submit" class="seg-off {% if engine_state == 'OFF' %}active{% endif %}"
+                            title="Stop the monitor — no more automatic processing">
+                            ⏹&nbsp;OFF
+                        </button>
+                    </form>
+                </div>
+                <!-- Clear cache — secondary action -->
+                <form method="POST" action="/admin/engine/clear-cache"
+                      onsubmit="return confirm('Reset sent-history for all merchants?\nNext Run Once / Always ON cycle will re-send WA to every approved merchant.');"
+                      style="margin:0;">
+                    <button type="submit"
+                        title="Wipes stored fingerprints + resets WA history so next run re-sends to everyone"
+                        style="background:none;border:1px solid #dee2e6;color:#6c757d;padding:0.35rem 0.85rem;border-radius:7px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:border-color 0.15s,color 0.15s;"
+                        onmouseover="this.style.borderColor='#aaa';this.style.color='#444';"
+                        onmouseout="this.style.borderColor='#dee2e6';this.style.color='#6c757d';">
+                        🗑 Clear Cache &amp; Reset Sent-History
+                    </button>
+                </form>
+            </div>
         </div>
+
+        <script>
+        // Show loading state on segment buttons while form submits
+        (function(){
+            document.querySelectorAll('.engine-seg button[type=submit]').forEach(function(btn){
+                btn.closest('form').addEventListener('submit', function(){
+                    document.querySelectorAll('.engine-seg button').forEach(function(b){ b.disabled=true; });
+                    btn.innerHTML = '⏳&nbsp;Working&hellip;';
+                });
+            });
+        })();
+        </script>
 
         <!-- Engine Summary Banner -->
         {% if engine_summary %}
@@ -283,9 +370,9 @@
                         </td>
                         <td>
                             <a href="/dashboard/{{ m.merchant_id }}" class="btn-view">View</a>
-                            {% if rs %}
+                            {% if rs and rs.decision != 'REJECTED' %}
                             <form method="POST" action="/dashboard/{{ m.merchant_id }}/send-offer" style="display:inline;margin-left:4px;">
-                                <button type="submit" title="Send offer via WhatsApp"
+                                <button type="submit" title="Send pre-approved offer via WhatsApp"
                                     style="padding:0.28rem 0.55rem;background:#25D366;color:white;border:none;border-radius:5px;font-size:0.78rem;cursor:pointer;line-height:1.2;">
                                     📲
                                 </button>
@@ -355,6 +442,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% if engine_state == 'ALWAYS_ON' and monitor_running %}
+    <script>
+    // Auto-refresh every 30s when Always ON is active so the live state badge stays in sync
+    setTimeout(function(){ location.reload(); }, 30000);
+    </script>
+    {% endif %}
     <script>
     // ── Inline mobile number editor ───────────────────────────────────────────
     document.querySelectorAll('.mobile-cell').forEach(cell => {
@@ -395,7 +488,8 @@
 
         async function doSave() {
             const num = input.value.trim();
-            const origText = saveBtn.textContent;
+            if (!num) { alert('Please enter a valid number (e.g. +91XXXXXXXXXX)'); return; }
+
             saveBtn.textContent = '⏳';
             saveBtn.disabled = true;
 
@@ -407,12 +501,56 @@
                     method: 'POST', body: fd
                 });
                 const data = await resp.json();
+
                 if (data.ok) {
                     showDisplay(num);
-                    cell.style.background = '#d4f8e8';
-                    setTimeout(() => { cell.style.background = ''; cell.style.transition = 'background 0.8s'; }, 800);
+
+                    // Pick background and tooltip based on WA outcome
+                    let bgColor, title;
+                    if (data.wa_sent) {
+                        bgColor = '#d4f8e8';   // green — saved + WA sent
+                        title   = '✅ Number saved & WhatsApp offer sent!';
+                    } else if (data.wa_status === 'no_decision_yet') {
+                        bgColor = '#fff9d4';   // yellow — saved, no decision yet
+                        title   = '💾 Number saved. Run the engine to send WA offer.';
+                    } else if (data.wa_status === 'rejected') {
+                        bgColor = '#fde8e8';   // red — rejected merchant
+                        title   = '💾 Number saved. Merchant is REJECTED — no WA sent.';
+                    } else if (data.wa_status === 'bad_number') {
+                        bgColor = '#fff3cd';
+                        title   = `⚠ Number saved but format invalid for WA: ${data.wa_error}`;
+                    } else if (data.wa_status === 'failed' || data.wa_status === 'error') {
+                        bgColor = '#fff3cd';
+                        title   = `⚠ Number saved but WA failed: ${data.wa_error || ''}`;
+                    } else {
+                        bgColor = '#d4f8e8';
+                        title   = '✅ Number saved.';
+                    }
+
+                    cell.title = title;
+                    cell.style.background = bgColor;
+                    // Brief flash then fade out
+                    setTimeout(() => {
+                        cell.style.transition = 'background 1.2s';
+                        cell.style.background = '';
+                    }, 1500);
+
+                    // Show a small toast below the cell
+                    let toast = document.getElementById('mobile-toast');
+                    if (!toast) {
+                        toast = document.createElement('div');
+                        toast.id = 'mobile-toast';
+                        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;padding:0.65rem 1.1rem;border-radius:10px;font-size:0.85rem;font-weight:600;box-shadow:0 4px 18px rgba(0,0,0,.18);transition:opacity 0.5s;';
+                        document.body.appendChild(toast);
+                    }
+                    toast.textContent = title;
+                    toast.style.background = data.wa_sent ? '#27ae60' : '#f39c12';
+                    toast.style.color = 'white';
+                    toast.style.opacity = '1';
+                    clearTimeout(toast._hide);
+                    toast._hide = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
                 } else {
-                    alert('Save failed: ' + (data.error || 'Unknown'));
+                    alert('Save failed: ' + (data.error || 'Unknown error'));
                     showDisplay();
                 }
             } catch(e) {
@@ -420,7 +558,7 @@
                 showDisplay();
             }
 
-            saveBtn.textContent = origText;
+            saveBtn.textContent = '✓';
             saveBtn.disabled = false;
         }
 

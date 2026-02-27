@@ -49,7 +49,8 @@ def dashboard_home(request: Request, db: Session = Depends(get_db)):
 
     # Engine summary (stored after last engine run)
     engine_summary = None
-    if request.query_params.get("engine") == "done":
+    ep = request.query_params.get("engine", "")
+    if ep in ("done", "always_on"):
         raw = get_config(db, "last_engine_summary", "")
         if raw:
             try:
@@ -60,6 +61,10 @@ def dashboard_home(request: Request, db: Session = Depends(get_db)):
     underwriting_mode = get_config(db, "underwriting_mode", "AUTO")
     test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
     test_mobile_number = get_config(db, "test_mobile_number", "")
+    engine_state = get_config(db, "engine_state", "OFF")
+
+    from app.services import monitor_service as _ms
+    monitor_running = _ms.is_running()
 
     return templates.TemplateResponse(
         "merchant_list.html",
@@ -71,6 +76,8 @@ def dashboard_home(request: Request, db: Session = Depends(get_db)):
             "underwriting_mode": underwriting_mode,
             "test_override_enabled": test_override_enabled,
             "test_mobile_number": test_mobile_number,
+            "engine_state": engine_state,
+            "monitor_running": monitor_running,
         }
     )
 
@@ -252,17 +259,97 @@ def update_mobile(merchant_id: str, mobile_number: str = Form(...), db: Session 
 def update_mobile_inline(merchant_id: str, request: Request, mobile_number: str = Form(...), db: Session = Depends(get_db)):
     """
     AJAX endpoint — update mobile number from main table inline editor.
-    Returns JSON {"ok": true, "number": "..."} so the UI can update in-place.
+    After saving:
+      1. Wipes the stored fingerprint so the next engine cycle re-processes this merchant.
+      2. If the merchant already has an APPROVED decision, sends WA immediately to the new number.
+    Returns JSON {ok, number, wa_sent, wa_status} for the JS to show live feedback.
     """
     merchant = db.query(Merchant).filter(Merchant.merchant_id == merchant_id).first()
     if not merchant:
         return JSONResponse({"ok": False, "error": "Merchant not found"}, status_code=404)
 
     raw = mobile_number.strip()
+    if not raw:
+        return JSONResponse({"ok": False, "error": "Number cannot be empty"}, status_code=400)
+
     merchant.mobile_number = raw
     db.commit()
     logger.info(f"[Inline] Mobile updated for {merchant_id}: {raw}")
-    return JSONResponse({"ok": True, "merchant_id": merchant_id, "number": raw})
+
+    # Wipe stored fingerprint so engine re-processes this merchant on next cycle
+    from app.services.config_service import set_config as _set_config
+    _set_config(db, f"fp_{merchant_id}", "")  # empty = will be treated as changed
+    logger.info(f"[Inline] Fingerprint wiped for {merchant_id} — engine will re-detect")
+
+    # If merchant already has an approved decision, send WA immediately to the new number
+    wa_sent = False
+    wa_status = "not_sent"
+    wa_error = None
+
+    risk_score = db.query(RiskScore).filter(
+        RiskScore.merchant_id == merchant_id
+    ).order_by(RiskScore.id.desc()).first()
+
+    if risk_score and risk_score.decision not in ("REJECTED", None, ""):
+        try:
+            from app.services.whatsapp_service import WhatsAppService, normalize_wa_number
+            test_override = get_config(db, "test_mobile_override_enabled", "false")
+            test_num = get_config(db, "test_mobile_number", "")
+            dest = test_num if test_override == "true" and test_num else raw
+            to_number = normalize_wa_number(dest)
+
+            if to_number:
+                fo_dict = {}
+                if risk_score.financial_offer:
+                    try:
+                        import json as _json
+                        fo_dict = _json.loads(risk_score.financial_offer)
+                    except Exception:
+                        fo_dict = {}
+
+                base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+                offer_link = (
+                    f"{base_url}/offer/{merchant.secure_token}"
+                    if getattr(merchant, "secure_token", None) else ""
+                )
+                result = WhatsAppService().send_underwriting_result(
+                    to_number=to_number,
+                    merchant_id=merchant_id,
+                    merchant_name=getattr(merchant, "business_name", "") or merchant_id,
+                    risk_tier=risk_score.risk_tier,
+                    decision=risk_score.decision,
+                    risk_score=risk_score.risk_score,
+                    explanation=risk_score.explanation or "",
+                    financial_offer=fo_dict,
+                    secure_offer_link=offer_link,
+                )
+                wa_sent = result.get("status") in ("queued", "sent", "delivered")
+                wa_status = "sent" if wa_sent else "failed"
+                if wa_sent:
+                    risk_score.whatsapp_status = "SENT"
+                    db.commit()
+                    logger.info(f"[Inline] ✅ WA sent to {merchant_id} at new number {to_number}")
+                else:
+                    wa_error = result.get("error", "Unknown error")
+                    logger.warning(f"[Inline] ❌ WA failed for {merchant_id}: {wa_error}")
+            else:
+                wa_status = "bad_number"
+                wa_error = f"Cannot normalize: {raw}"
+        except Exception as e:
+            wa_status = "error"
+            wa_error = str(e)
+            logger.error(f"[Inline] WA send error for {merchant_id}: {e}", exc_info=True)
+    else:
+        wa_status = "no_decision_yet" if not risk_score else "rejected"
+
+    return JSONResponse({
+        "ok": True,
+        "merchant_id": merchant_id,
+        "number": raw,
+        "wa_sent": wa_sent,
+        "wa_status": wa_status,
+        "wa_error": wa_error,
+    })
 
 
 @router.post("/{merchant_id}/send-offer")
@@ -282,6 +369,14 @@ def send_offer_whatsapp(merchant_id: str, db: Session = Depends(get_db)):
     ).order_by(RiskScore.id.desc()).first()
     if not risk_score:
         raise HTTPException(status_code=404, detail="No underwriting record found")
+
+    # Block send for rejected merchants — they have no pre-approved offer
+    if risk_score.decision == "REJECTED":
+        logger.info(f"[ManualWA] Blocked send for {merchant_id} — decision is REJECTED")
+        return RedirectResponse(
+            url=f"/dashboard/{merchant_id}?success=Cannot+send+offer+to+REJECTED+merchant",
+            status_code=303
+        )
 
     # Determine destination number
     test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
