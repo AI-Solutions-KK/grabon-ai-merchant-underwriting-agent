@@ -38,7 +38,10 @@ When explaining decisions, consider:
         merchant_data: dict,
         risk_score: int,
         risk_tier: str,
-        decision: str
+        decision: str,
+        category_benchmark: dict = None,
+        gmv_yoy_pct: float = None,
+        score_breakdown: dict = None,
     ) -> str:
         """
         Generate Claude-powered explanation for underwriting decision.
@@ -54,7 +57,12 @@ When explaining decisions, consider:
         """
         try:
             agent = ClaudeUnderwritingAgent()
-            return agent._call_claude(merchant_data, risk_score, risk_tier, decision)
+            return agent._call_claude(
+                merchant_data, risk_score, risk_tier, decision,
+                category_benchmark=category_benchmark or {},
+                gmv_yoy_pct=gmv_yoy_pct,
+                score_breakdown=score_breakdown or {},
+            )
         except Exception as e:
             # Return fallback explanation if Claude fails
             return ClaudeUnderwritingAgent._fallback_explanation(
@@ -66,7 +74,10 @@ When explaining decisions, consider:
         merchant_data: dict,
         risk_score: int,
         risk_tier: str,
-        decision: str
+        decision: str,
+        category_benchmark: dict = None,
+        gmv_yoy_pct: float = None,
+        score_breakdown: dict = None,
     ) -> str:
         """
         Call Claude API with underwriting context including behavioral metrics.
@@ -93,7 +104,7 @@ When explaining decisions, consider:
         gmv = merchant_data.get('gmv', 0)
         refund_rate = merchant_data.get('refund_rate', 0)
         chargeback_rate = merchant_data.get('chargeback_rate', 0)
-        
+
         # Extract behavioral metrics
         category = merchant_data.get('category', 'General')
         coupon_redemption_rate = merchant_data.get('coupon_redemption_rate', 0)
@@ -103,40 +114,54 @@ When explaining decisions, consider:
         seasonality_index = merchant_data.get('seasonality_index', 1.0)
         deal_exclusivity_rate = merchant_data.get('deal_exclusivity_rate', 0)
         return_and_refund_rate = merchant_data.get('return_and_refund_rate', 0)
-        
-        # Compute quarterly GMV trend if 12-month history available
-        monthly_gmv_12m = merchant_data.get('monthly_gmv_12m', [])
-        gmv_trend = "Unknown"
-        if monthly_gmv_12m and len(monthly_gmv_12m) >= 4:
-            recent_quarter = sum(monthly_gmv_12m[-3:]) / 3
-            prior_quarter = sum(monthly_gmv_12m[-6:-3]) / 3
-            if prior_quarter > 0:
-                trend_pct = ((recent_quarter - prior_quarter) / prior_quarter) * 100
-                gmv_trend = f"{'Growing' if trend_pct > 0 else 'Declining'} ({trend_pct:+.1f}%)"
-        
-        # Build comprehensive merchant context for Claude
+
+        # GMV trend
+        monthly_gmv_12m = merchant_data.get('monthly_gmv_12m') or []
+        if gmv_yoy_pct is not None:
+            direction = "growing" if gmv_yoy_pct > 0 else "declining"
+            gmv_trend = f"{direction} ({gmv_yoy_pct:+.1f}% H1→H2)"
+        elif len(monthly_gmv_12m) >= 4:
+            recent = sum(monthly_gmv_12m[-3:]) / 3
+            prior = sum(monthly_gmv_12m[-6:-3]) / 3
+            if prior > 0:
+                pct = ((recent - prior) / prior) * 100
+                gmv_trend = f"{'Growing' if pct > 0 else 'Declining'} ({pct:+.1f}%)"
+            else:
+                gmv_trend = "Stable"
+        else:
+            gmv_trend = "Insufficient data"
+
+        # Category benchmarks
+        bench = category_benchmark or {}
+        bench_refund = bench.get('refund_rate', 0.045)
+        bench_chargeback = bench.get('chargeback_rate', 0.015)
+        bench_crr = bench.get('customer_return_rate', 0.35)
+        vs_refund = "below" if refund_rate < bench_refund else "above"
+        vs_chargeback = "below" if chargeback_rate < bench_chargeback else "above"
+        vs_crr = "above" if customer_return_rate > bench_crr else "below"
+
         context = f"""
 FINANCIAL PROFILE:
 - Merchant ID: {merchant_id} (Category: {category})
-- Monthly Revenue: ${monthly_revenue:,.2f}
-- Gross Merchandise Value (GMV): ${gmv:,.2f}
+- Monthly Revenue: ₹{monthly_revenue:,.0f}
+- Annual GMV: ₹{gmv * 12:,.0f}  (monthly snapshot: ₹{gmv:,.0f})
 - Credit Score: {credit_score}
 - Years in Business: {years_in_business}
 - Active Loans: {existing_loans}
 - Past Defaults: {past_defaults}
 
 TRANSACTION METRICS:
-- Refund Rate: {refund_rate*100:.1f}%
-- Chargeback Rate: {chargeback_rate*100:.1f}%
+- Refund Rate: {refund_rate*100:.1f}%  ({vs_refund} category avg of {bench_refund*100:.1f}%)
+- Chargeback Rate: {chargeback_rate*100:.1f}%  ({vs_chargeback} category avg of {bench_chargeback*100:.1f}%)
 - Return & Refund Rate: {return_and_refund_rate*100:.1f}%
 
 CUSTOMER BEHAVIOR:
 - Unique Customers: {unique_customer_count:,}
-- Customer Return Rate: {customer_return_rate*100:.1f}% (loyalty indicator)
-- Coupon Engagement: {coupon_redemption_rate*100:.1f}%
-- Deal Exclusivity: {deal_exclusivity_rate*100:.1f}%
-- Average Order Value: ${avg_order_value:,.2f}
-- Seasonality Index: {seasonality_index:.2f}x (peak-to-trough volatility)
+- Customer Return Rate: {customer_return_rate*100:.0f}%  ({vs_crr} category avg of {bench_crr*100:.0f}%)
+- Coupon Engagement: {coupon_redemption_rate*100:.0f}%
+- Deal Exclusivity: {deal_exclusivity_rate*100:.0f}%
+- Average Order Value: ₹{avg_order_value:,.0f}
+- Seasonality Index: {seasonality_index:.2f}x (peak-to-trough ratio)
 - GMV Trend: {gmv_trend}
 
 UNDERWRITING ASSESSMENT:
@@ -144,13 +169,14 @@ UNDERWRITING ASSESSMENT:
 - Risk Tier: {risk_tier}
 - Decision: {decision}
 
-TASK: Generate 3–5 professional sentences explaining the underwriting decision.
+TASK: Generate 3–5 professional sentences explaining this underwriting decision.
 REQUIREMENTS:
-1. Reference at least 3 specific financial metrics (credit score, revenue, business age, defaults)
-2. Reference at least 2 behavioral indicators (customer loyalty, transaction quality, seasonality)
-3. Explain how these metrics support the {risk_tier} classification
-4. Maintain formal, underwriting-professional language
-5. Return ONLY the explanation text, no additional commentary or headers"""
+1. Cite specific numbers (e.g., "credit score of {credit_score}", "refund rate of {refund_rate*100:.1f}%")
+2. Compare at least one metric to its category average benchmark
+3. Reference the GMV trend and at least one behavioral indicator (customer return rate, seasonality)
+4. Explain WHY the decision is {decision} in formal underwriting language
+5. For REJECTED: explain which specific factors caused rejection
+6. Return ONLY the explanation — no headers, no bullet points, no JSON"""
 
         # Call Claude API
         message = self.client.messages.create(

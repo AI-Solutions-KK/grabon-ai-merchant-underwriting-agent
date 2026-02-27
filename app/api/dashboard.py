@@ -13,13 +13,15 @@ import json
 from pathlib import Path
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, HTTPException, Form
-from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from fastapi.responses import RedirectResponse, JSONResponse
 from app.db.session import get_db
 from app.models.merchant import Merchant
 from app.models.risk_score import RiskScore
 from app.schemas.decision_schema import FinancialOffer
+from app.services.config_service import get_config, set_config
+from app.services.whatsapp_service import normalize_wa_number
 
 logger = logging.getLogger(__name__)
 
@@ -35,29 +37,40 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("/")
 def dashboard_home(request: Request, db: Session = Depends(get_db)):
-    """
-    Dashboard home page with merchant list
-    """
+    """Dashboard home — merchant list with engine trigger button."""
     merchants = db.query(Merchant).all()
-    
-    # Enrich with latest risk scores
+
     merchants_data = []
     for merchant in merchants:
         risk_score = db.query(RiskScore).filter(
             RiskScore.merchant_id == merchant.merchant_id
         ).order_by(RiskScore.id.desc()).first()
-        
-        merchants_data.append({
-            "merchant": merchant,
-            "risk_score": risk_score
-        })
-    
+        merchants_data.append({"merchant": merchant, "risk_score": risk_score})
+
+    # Engine summary (stored after last engine run)
+    engine_summary = None
+    if request.query_params.get("engine") == "done":
+        raw = get_config(db, "last_engine_summary", "")
+        if raw:
+            try:
+                engine_summary = json.loads(raw)
+            except Exception:
+                engine_summary = None
+
+    underwriting_mode = get_config(db, "underwriting_mode", "AUTO")
+    test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
+    test_mobile_number = get_config(db, "test_mobile_number", "")
+
     return templates.TemplateResponse(
         "merchant_list.html",
         {
             "request": request,
             "merchants_data": merchants_data,
-            "page_title": "Merchant Dashboard"
+            "page_title": "Merchant Dashboard",
+            "engine_summary": engine_summary,
+            "underwriting_mode": underwriting_mode,
+            "test_override_enabled": test_override_enabled,
+            "test_mobile_number": test_mobile_number,
         }
     )
 
@@ -90,6 +103,8 @@ def merchant_detail(merchant_id: str, request: Request, db: Session = Depends(ge
         "decision": risk_score.decision,
         "explanation": risk_score.explanation,
         "offer_status": risk_score.offer_status,
+        "whatsapp_status": getattr(risk_score, "whatsapp_status", "NOT_SENT"),
+        "decision_source": getattr(risk_score, "decision_source", "AGENT"),
         "financial_offer": None
     }
     
@@ -100,16 +115,56 @@ def merchant_detail(merchant_id: str, request: Request, db: Session = Depends(ge
         except json.JSONDecodeError:
             logger.warning(f"Failed to deserialize financial_offer for merchant {merchant_id}")
             risk_score_dict["financial_offer"] = None
-    
+
+    # All merchants for dropdown selector
+    all_merchants = db.query(Merchant).all()
+
+    # System config for test-mode panel and underwriting mode
+    test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
+    test_mobile_number = get_config(db, "test_mobile_number", "")
+    underwriting_mode = get_config(db, "underwriting_mode", "AUTO")
+
     return templates.TemplateResponse(
         "merchant_detail.html",
         {
             "request": request,
             "merchant": merchant,
             "risk_score": risk_score_dict,
-            "page_title": f"Merchant {merchant_id} - Details"
+            "page_title": f"Merchant {merchant_id} - Details",
+            "all_merchants": all_merchants,
+            "success_message": request.query_params.get("success"),
+            "test_override_enabled": test_override_enabled,
+            "test_mobile_number": test_mobile_number,
+            "underwriting_mode": underwriting_mode,
         }
     )
+
+
+@router.post("/config/test-mode")
+def save_test_mode_config(
+    test_override_enabled: str = Form("false"),
+    test_mobile_number: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """Save WhatsApp test-mode override settings."""
+    set_config(db, "test_mobile_override_enabled", test_override_enabled)
+    set_config(db, "test_mobile_number", test_mobile_number.strip())
+    logger.info(f"Test mode override set: enabled={test_override_enabled}, number={test_mobile_number.strip()}")
+    return RedirectResponse(url="/dashboard/?success=Test+mode+settings+saved", status_code=303)
+
+
+@router.post("/config/underwriting-mode")
+def save_underwriting_mode(
+    underwriting_mode: str = Form("AUTO"),
+    db: Session = Depends(get_db)
+):
+    """Save underwriting auto/manual mode."""
+    mode = underwriting_mode.upper()
+    if mode not in ("AUTO", "MANUAL"):
+        mode = "AUTO"
+    set_config(db, "underwriting_mode", mode)
+    logger.info(f"Underwriting mode set to: {mode}")
+    return RedirectResponse(url="/dashboard/?success=Underwriting+mode+updated", status_code=303)
 
 
 @router.post("/{merchant_id}/accept")
@@ -124,12 +179,175 @@ def accept_offer(merchant_id: str, db: Session = Depends(get_db)):
     
     if not risk_score:
         raise HTTPException(status_code=404, detail="Underwriting record not found")
-    
-    # Mark offer as accepted
+
     risk_score.offer_status = "ACCEPTED"
     db.commit()
-    
     logger.info(f"Offer accepted for merchant {merchant_id}")
-    
-    # Redirect back to detail page with success indicator
-    return RedirectResponse(url=f"/dashboard/{merchant_id}", status_code=303)
+
+    # Send confirmation WhatsApp (non-blocking, fail-safe)
+    _send_acceptance_confirmation(db, merchant_id, risk_score)
+
+    return RedirectResponse(
+        url=f"/dashboard/{merchant_id}?success=Offer+accepted+and+confirmation+sent",
+        status_code=303
+    )
+
+
+def _send_acceptance_confirmation(db, merchant_id: str, risk_score) -> None:
+    """Send a brief acceptance confirmation via WhatsApp. Silently skips on any error."""
+    try:
+        from app.services.whatsapp_service import WhatsAppService
+
+        merchant = db.query(Merchant).filter(Merchant.merchant_id == merchant_id).first()
+        if not merchant:
+            return
+
+        # Respect test-mode override
+        test_override = get_config(db, "test_mobile_override_enabled", "false")
+        test_number = get_config(db, "test_mobile_number", "")
+        raw_number = merchant.mobile_number or ""
+        if test_override == "true" and test_number:
+            raw_number = test_number
+
+        if not raw_number.strip():
+            logger.info(f"[Accept] No mobile for {merchant_id} — skipping confirmation WA")
+            return
+
+        to_number = normalize_wa_number(raw_number)
+        if not to_number:
+            logger.warning(f"[Accept] Invalid mobile '{raw_number}' for {merchant_id} — skipping WA")
+            return
+
+        msg = (
+            f"✅ *Offer Confirmation*\n\n"
+            f"Dear {merchant_id},\n\n"
+            f"Your GrabCredit offer has been successfully accepted.\n"
+            f"Risk Tier: {risk_score.risk_tier}\n\n"
+            f"Our onboarding team will contact you shortly.\n\n"
+            f"— GrabCredit Team"
+        )
+        wa = WhatsAppService()
+        wa.send_message(to_number, msg)
+        logger.info(f"[Accept] Confirmation WA sent to {to_number}")
+    except Exception as e:
+        logger.warning(f"[Accept] Confirmation WA failed for {merchant_id}: {e}")
+
+
+@router.post("/{merchant_id}/update-mobile")
+def update_mobile(merchant_id: str, mobile_number: str = Form(...), db: Session = Depends(get_db)):
+    """Update mobile from detail page (redirect response)."""
+    merchant = db.query(Merchant).filter(Merchant.merchant_id == merchant_id).first()
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    merchant.mobile_number = mobile_number.strip()
+    db.commit()
+    logger.info(f"Mobile updated for merchant {merchant_id}: {mobile_number}")
+    return RedirectResponse(
+        url=f"/dashboard/{merchant_id}?success=Mobile+number+updated+successfully",
+        status_code=303
+    )
+
+
+@router.post("/{merchant_id}/mobile-inline")
+def update_mobile_inline(merchant_id: str, request: Request, mobile_number: str = Form(...), db: Session = Depends(get_db)):
+    """
+    AJAX endpoint — update mobile number from main table inline editor.
+    Returns JSON {"ok": true, "number": "..."} so the UI can update in-place.
+    """
+    merchant = db.query(Merchant).filter(Merchant.merchant_id == merchant_id).first()
+    if not merchant:
+        return JSONResponse({"ok": False, "error": "Merchant not found"}, status_code=404)
+
+    raw = mobile_number.strip()
+    merchant.mobile_number = raw
+    db.commit()
+    logger.info(f"[Inline] Mobile updated for {merchant_id}: {raw}")
+    return JSONResponse({"ok": True, "merchant_id": merchant_id, "number": raw})
+
+
+@router.post("/{merchant_id}/send-offer")
+def send_offer_whatsapp(merchant_id: str, db: Session = Depends(get_db)):
+    """
+    Manually send the underwriting offer to the merchant via WhatsApp.
+    Respects test-mode override. Updates whatsapp_status on RiskScore.
+    """
+    from app.services.whatsapp_service import WhatsAppService
+
+    merchant = db.query(Merchant).filter(Merchant.merchant_id == merchant_id).first()
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+
+    risk_score = db.query(RiskScore).filter(
+        RiskScore.merchant_id == merchant_id
+    ).order_by(RiskScore.id.desc()).first()
+    if not risk_score:
+        raise HTTPException(status_code=404, detail="No underwriting record found")
+
+    # Determine destination number
+    test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
+    test_mobile_number = get_config(db, "test_mobile_number", "")
+
+    raw_number = merchant.mobile_number or ""
+    if test_override_enabled == "true" and test_mobile_number:
+        raw_number = test_mobile_number
+        logger.info(f"[TestMode] Overriding send number to {raw_number} for merchant {merchant_id}")
+
+    if not raw_number:
+        logger.warning(f"No mobile number set for merchant {merchant_id} — cannot send WhatsApp")
+        return RedirectResponse(
+            url=f"/dashboard/{merchant_id}?success=No+mobile+number+set+for+this+merchant",
+            status_code=303
+        )
+
+    # Normalize to whatsapp:+E.164
+    to_number = normalize_wa_number(raw_number)
+    if not to_number:
+        return RedirectResponse(
+            url=f"/dashboard/{merchant_id}?success=Invalid+phone+number+format",
+            status_code=303
+        )
+
+    # Build secure offer link for message
+    base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+    offer_link = (
+        f"{base_url}/offer/{merchant.secure_token}"
+        if getattr(merchant, "secure_token", None)
+        else ""
+    )
+
+    # Parse financial_offer to dict for message formatter
+    fo_dict = {}
+    if risk_score.financial_offer:
+        try:
+            fo_dict = json.loads(risk_score.financial_offer)
+        except Exception:
+            fo_dict = {}
+
+    wa_service = WhatsAppService()
+    result = wa_service.send_underwriting_result(
+        to_number=to_number,
+        merchant_id=merchant_id,
+        merchant_name=getattr(merchant, "business_name", "") or merchant_id,
+        risk_tier=risk_score.risk_tier,
+        decision=risk_score.decision,
+        risk_score=risk_score.risk_score,
+        explanation=risk_score.explanation or "",
+        financial_offer=fo_dict,
+        secure_offer_link=offer_link,
+    )
+
+    # Update whatsapp_status
+    if result.get("status") in ("queued", "sent", "delivered"):
+        risk_score.whatsapp_status = "SENT"
+        status_msg = "WhatsApp+offer+sent+successfully"
+    else:
+        risk_score.whatsapp_status = "FAILED"
+        status_msg = "WhatsApp+send+failed+check+logs"
+
+    db.commit()
+    logger.info(f"WhatsApp send for merchant {merchant_id}: {result}")
+
+    return RedirectResponse(
+        url=f"/dashboard/{merchant_id}?success={status_msg}",
+        status_code=303
+    )

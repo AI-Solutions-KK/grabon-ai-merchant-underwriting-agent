@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Financial Offer — GrabCredit</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --grab-orange: #f5a623;
+            --grab-orange-dark: #e6920e;
+            --grab-green: #00b14f;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --dark: #1a2035;
+            --muted: #6c757d;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(145deg, #1a2035 0%, #2c3e50 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 2rem 1rem 4rem;
+        }
+
+        /* ── Card shell ── */
+        .offer-card-shell {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+            max-width: 680px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        /* ── Header ── */
+        .offer-header {
+            background: linear-gradient(135deg, var(--grab-orange) 0%, #ff7b2f 100%);
+            color: white;
+            padding: 2.2rem 2rem 1.8rem;
+            text-align: center;
+            position: relative;
+        }
+        .offer-header .brand {
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            opacity: 0.85;
+            margin-bottom: 0.5rem;
+        }
+        .offer-header h1 {
+            font-size: 1.85rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 0.4rem;
+        }
+        .offer-header p {
+            font-size: 0.9rem;
+            opacity: 0.88;
+        }
+
+        /* ── Tier badge ── */
+        .tier-pill {
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 0.35rem 1rem;
+            border-radius: 50px;
+            margin-top: 0.8rem;
+        }
+        .tier-pill.tier-1 { background: rgba(255,255,255,0.25); color: white; border: 1.5px solid rgba(255,255,255,0.5); }
+        .tier-pill.tier-2 { background: rgba(255,255,255,0.15); color: white; border: 1.5px solid rgba(255,255,255,0.4); }
+        .tier-pill.tier-3 { background: rgba(231,76,60,0.25);  color: white; border: 1.5px solid rgba(231,76,60,0.6); }
+
+        /* ── Body ── */
+        .offer-body { padding: 1.8rem 2rem 2rem; }
+
+        /* ── Status banner ── */
+        .status-banner {
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .status-banner.accepted { background: #d4f8e8; color: #0d6e3b; border-left: 4px solid var(--success); }
+        .status-banner.rejected { background: #fde8e8; color: #922020; border-left: 4px solid var(--danger); }
+
+        /* ── Merchant info ── */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .info-item {
+            background: #f7f8fa;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            border-left: 3px solid var(--grab-orange);
+        }
+        .info-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 0.25rem; }
+        .info-value { font-size: 0.95rem; font-weight: 700; color: var(--dark); }
+
+        /* ── Decision bar ── */
+        .decision-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+        }
+        .decision-bar.approved  { background: #eafaf1; border-left: 4px solid var(--success); }
+        .decision-bar.cond      { background: #fef9e7; border-left: 4px solid var(--warning); }
+        .decision-bar.rejected  { background: #fdf0f0; border-left: 4px solid var(--danger); }
+        .decision-icon { font-size: 2rem; line-height: 1; }
+        .decision-label { font-size: 1.05rem; font-weight: 700; margin: 0; }
+        .decision-sub   { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+        /* ── Section heading ── */
+        .section-heading {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 1rem;
+        }
+
+        /* ── Offer cards ── */
+        .offers-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .product-card {
+            border-radius: 12px;
+            padding: 1.4rem;
+            border: 1.5px solid #e8eaed;
+            position: relative;
+            overflow: hidden;
+        }
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+        }
+        .product-card.credit::before  { background: linear-gradient(90deg, #007bff, #00bcd4); }
+        .product-card.insurance::before { background: linear-gradient(90deg, #7c3aed, #c026d3); }
+        .product-card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 1rem;
+        }
+        .product-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .product-stat:last-child { border-bottom: none; }
+        .stat-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+        .stat-value { font-size: 1rem; font-weight: 700; color: var(--dark); }
+        .tenure-chip {
+            display: inline-block;
+            background: #e8f4ff;
+            color: #0056b3;
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin: 0.15rem 0.15rem 0 0;
+        }
+
+        /* ── Action buttons ── */
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+        .btn-accept {
+            background: linear-gradient(135deg, var(--grab-green), #00913f);
+            color: white;
+            border: none;
+            padding: 0.85rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            width: 100%;
+        }
+        .btn-accept:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0,177,79,0.35);
+        }
+        .btn-decline {
+            background: white;
+            color: var(--muted);
+            border: 1.5px solid #ddd;
+            padding: 0.85rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            width: 100%;
+        }
+        .btn-decline:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+            transform: translateY(-2px);
+        }
+
+        /* ── Offer status badge ── */
+        .offer-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1.1rem;
+            border-radius: 50px;
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+        .offer-status-badge.accepted { background: #d4f8e8; color: #0d6e3b; }
+        .offer-status-badge.rejected { background: #fde8e8; color: #922020; }
+        .offer-status-badge.pending  { background: #fff3cd; color: #856404; }
+
+        /* ── Footer ── */
+        .offer-footer {
+            margin-top: 1.8rem;
+            padding-top: 1.2rem;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+        .offer-footer a { color: var(--grab-orange); text-decoration: none; }
+        .offer-footer a:hover { text-decoration: underline; }
+
+        /* ── Powered by footer ── */
+        .page-footer {
+            margin-top: 2rem;
+            text-align: center;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.78rem;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 580px) {
+            body { padding: 0; }
+            .offer-card-shell { border-radius: 0; max-width: 100%; }
+            .info-grid { grid-template-columns: 1fr; }
+            .offers-row { grid-template-columns: 1fr; }
+            .action-row { grid-template-columns: 1fr; }
+            .offer-body { padding: 1.25rem; }
+            .offer-header { padding: 1.5rem; }
+            .offer-header h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="offer-card-shell">
+
+        <!-- ── Header ── -->
+        <div class="offer-header">
+            <div class="brand">GrabCredit</div>
+            <h1>Your Pre-Approved Offer</h1>
+            <p>Exclusively generated for your business profile</p>
+            <div class="tier-pill {% if risk_score.risk_tier == 'Tier 1' %}tier-1{% elif risk_score.risk_tier == 'Tier 2' %}tier-2{% else %}tier-3{% endif %}">
+                {{ risk_score.risk_tier }}
+            </div>
+        </div>
+
+        <!-- ── Body ── -->
+        <div class="offer-body">
+
+            <!-- Status banner (shown after accept / reject) -->
+            {% if status_message == 'accepted' %}
+            <div class="status-banner accepted">
+                <span>✅</span>
+                <span>Offer accepted! Our team will contact you within 24 hours to proceed with onboarding.</span>
+            </div>
+            {% elif status_message == 'rejected' %}
+            <div class="status-banner rejected">
+                <span>❌</span>
+                <span>You have declined this offer. You may contact us anytime to request a fresh review.</span>
+            </div>
+            {% endif %}
+
+            <!-- Merchant info -->
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Merchant ID</div>
+                    <div class="info-value">{{ merchant.merchant_id }}</div>
+                </div>
+                {% if merchant.category %}
+                <div class="info-item">
+                    <div class="info-label">Category</div>
+                    <div class="info-value">{{ merchant.category }}</div>
+                </div>
+                {% endif %}
+                <div class="info-item">
+                    <div class="info-label">Credit Score</div>
+                    <div class="info-value">{{ merchant.credit_score }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Years in Business</div>
+                    <div class="info-value">{{ merchant.years_in_business }}</div>
+                </div>
+            </div>
+
+            <!-- Decision bar -->
+            {% if 'APPROVED' in risk_score.decision and 'CONDITIONS' not in risk_score.decision %}
+            <div class="decision-bar approved">
+                <div class="decision-icon" style="color:var(--success);">✓</div>
+                <div>
+                    <p class="decision-label" style="color:var(--success);">Approved</p>
+                    <p class="decision-sub">Your financial offers are ready below.</p>
+                </div>
+            </div>
+            {% elif 'CONDITIONS' in risk_score.decision %}
+            <div class="decision-bar cond">
+                <div class="decision-icon" style="color:var(--warning);">⚠</div>
+                <div>
+                    <p class="decision-label" style="color:var(--warning);">Approved with Conditions</p>
+                    <p class="decision-sub">Please review the offer terms carefully before accepting.</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="decision-bar rejected">
+                <div class="decision-icon" style="color:var(--danger);">✕</div>
+                <div>
+                    <p class="decision-label" style="color:var(--danger);">Not Approved</p>
+                    <p class="decision-sub">No financial offers available at this time.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Financial offers -->
+            {% if financial_offer and (financial_offer.get('credit') or financial_offer.get('insurance')) %}
+            <div class="section-heading">Available Offers</div>
+            <div class="offers-row">
+
+                {% if financial_offer.get('credit') %}
+                <div class="product-card credit">
+                    <div class="product-card-title">💳 GrabCredit</div>
+                    <div class="product-stat">
+                        <span class="stat-label">Credit Limit</span>
+                        <span class="stat-value">₹{{ "{:,}".format((financial_offer.credit.credit_limit_lakhs * 100000)|int) }}</span>
+                    </div>
+                    <div class="product-stat">
+                        <span class="stat-label">Interest Rate</span>
+                        <span class="stat-value">{{ financial_offer.credit.interest_rate_percent }}% p.a.</span>
+                    </div>
+                    <div class="product-stat">
+                        <span class="stat-label">Tenure Options</span>
+                        <span class="stat-value">
+                            {% for t in financial_offer.credit.tenure_options_months %}
+                                <span class="tenure-chip">{{ t }}M</span>
+                            {% endfor %}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if financial_offer.get('insurance') %}
+                <div class="product-card insurance">
+                    <div class="product-card-title">🛡️ GrabInsurance</div>
+                    <div class="product-stat">
+                        <span class="stat-label">Coverage</span>
+                        <span class="stat-value">₹{{ "{:,}".format((financial_offer.insurance.coverage_amount_lakhs * 100000)|int) }}</span>
+                    </div>
+                    <div class="product-stat">
+                        <span class="stat-label">Annual Premium</span>
+                        <span class="stat-value">₹{{ "{:,}".format(financial_offer.insurance.premium_amount|int) }}</span>
+                    </div>
+                    <div class="product-stat">
+                        <span class="stat-label">Policy Type</span>
+                        <span class="stat-value">{{ financial_offer.insurance.policy_type }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+            {% endif %}
+
+            <!-- Action buttons or current status -->
+            {% if 'APPROVED' in risk_score.decision %}
+                {% if risk_score.offer_status == 'ACCEPTED' %}
+                <div style="text-align:center;margin:0.5rem 0 0.25rem;">
+                    <span class="offer-status-badge accepted">✅ Offer Accepted</span>
+                </div>
+                {% elif risk_score.offer_status == 'REJECTED' %}
+                <div style="text-align:center;margin:0.5rem 0 0.25rem;">
+                    <span class="offer-status-badge rejected">❌ Offer Declined</span>
+                </div>
+                {% else %}
+                <!-- Only show buttons if offer is still pending -->
+                {% if status_message not in ('accepted', 'rejected') %}
+                <div class="action-row">
+                    <form method="POST" action="/offer/{{ secure_token }}/accept" style="margin:0;">
+                        <button type="submit" class="btn-accept">✓ Accept Offer</button>
+                    </form>
+                    <form method="POST" action="/offer/{{ secure_token }}/reject"
+                          onsubmit="return confirm('Decline this offer? You can request a re-review anytime.');"
+                          style="margin:0;">
+                        <button type="submit" class="btn-decline">× Decline Offer</button>
+                    </form>
+                </div>
+                {% endif %}
+                {% endif %}
+            {% endif %}
+
+            <!-- Footer -->
+            <div class="offer-footer">
+                <p>Questions about your offer? <a href="mailto:support@grab.com">Contact Support</a></p>
+                <p style="margin-top:0.4rem;font-size:0.78rem;color:#bbb;">
+                    This offer is confidential and valid for 30 days from issuance.
+                    Offer ID: <code>{{ secure_token[:8] }}…</code>
+                </p>
+            </div>
+
+        </div><!-- /offer-body -->
+    </div><!-- /offer-card-shell -->
+
+    <div class="page-footer">
+        Powered by <strong>GrabCredit AI Underwriting</strong> &nbsp;|&nbsp; &copy; 2025 Grab Financial Group
+    </div>
+
+</body>
+</html>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #f5a623;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --secondary-color: #34495e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5a623 0%, #ff8c42 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .offer-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 700px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .offer-header {
+            background: linear-gradient(135deg, #f5a623 0%, #ff8c42 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .offer-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .offer-header p {
+            font-size: 0.95rem;
+            opacity: 0.95;
+            margin: 0;
+        }
+
+        .offer-body {
+            padding: 2rem;
+        }
+
+        .merchant-section {
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .merchant-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .info-item {
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            margin-bottom: 0.3rem;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .decision-section {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .decision-icon {
+            font-size: 3rem;
+        }
+
+        .decision-text h3 {
+            margin: 0 0 0.3rem 0;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .decision-text p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .tier-badge {
+            display: inline-block;
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-bottom: 1rem;
+        }
+
+        .tier-badge.tier-1 {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .tier-badge.tier-2 {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .tier-badge.tier-3 {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .offers-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .offers-section h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .offers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .offer-card {
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-left: 4px solid;
+        }
+
+        .offer-card.credit {
+            border-left-color: #007bff;
+        }
+
+        .offer-card.insurance {
+            border-left-color: #9c27b0;
+        }
+
+        .offer-card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .offer-detail {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .offer-detail:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .offer-detail-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .offer-detail-value {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        .no-offer {
+            padding: 1rem;
+            background: #e8f4f8;
+            border-radius: 6px;
+            color: #0c5460;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .action-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn-accept {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-accept:hover {
+            background: #219653;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-reject {
+            background: #f0f0f0;
+            color: #7f8c8d;
+            border: 1px solid #ddd;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-reject:hover {
+            background: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+            transform: translateY(-2px);
+            text-decoration: none;
+        }
+
+        .footer-text {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .footer-text a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .footer-text a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .offer-container {
+                border-radius: 0;
+            }
+
+            .offer-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .merchant-info {
+                grid-template-columns: 1fr;
+            }
+
+            .decision-section {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .offers-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-section {
+                grid-template-columns: 1fr;
+            }
+
+            .offer-body {
+                padding: 1.5rem;
+            }
+
+            .offer-header {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offer-container">
+        <!-- Header -->
+        <div class="offer-header">
+            <h1>💳 Your Financial Offer</h1>
+            <p>Exclusive offer tailored for your business</p>
+        </div>
+
+        <!-- Body -->
+        <div class="offer-body">
+            <!-- Merchant Section -->
+            <div class="merchant-section">
+                <h3 style="margin-bottom: 1rem; color: #2c3e50;">Business Information</h3>
+                
+                <div class="tier-badge {% if risk_score.risk_tier == 'Tier 1' %}tier-1{% elif risk_score.risk_tier == 'Tier 2' %}tier-2{% else %}tier-3{% endif %}">
+                    {{ risk_score.risk_tier }}
+                </div>
+
+                <div class="merchant-info">
+                    <div class="info-item">
+                        <div class="info-label">Business Name</div>
+                        <div class="info-value">{{ merchant.merchant_id }}</div>
+                    </div>
+                    
+                    {% if merchant.category %}
+                    <div class="info-item">
+                        <div class="info-label">Category</div>
+                        <div class="info-value">{{ merchant.category }}</div>
+                    </div>
+                    {% endif %}
+
+                    <div class="info-item">
+                        <div class="info-label">Credit Score</div>
+                        <div class="info-value">{{ merchant.credit_score }}</div>
+                    </div>
+
+                    <div class="info-item">
+                        <div class="info-label">Years in Business</div>
+                        <div class="info-value">{{ merchant.years_in_business }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decision Section -->
+            <div class="decision-section">
+                {% if 'APPROVED' in risk_score.decision and 'CONDITIONS' not in risk_score.decision %}
+                    <div class="decision-icon" style="color: var(--success-color);">✓</div>
+                    <div class="decision-text">
+                        <h3 style="color: var(--success-color);">Approved</h3>
+                        <p>Your financial offers are ready below.</p>
+                    </div>
+                {% elif 'CONDITIONS' in risk_score.decision %}
+                    <div class="decision-icon" style="color: var(--warning-color);">⚠</div>
+                    <div class="decision-text">
+                        <h3 style="color: var(--warning-color);">Approved with Conditions</h3>
+                        <p>Review the offer terms carefully.</p>
+                    </div>
+                {% else %}
+                    <div class="decision-icon" style="color: var(--danger-color);">✕</div>
+                    <div class="decision-text">
+                        <h3 style="color: var(--danger-color);">Not Approved</h3>
+                        <p>No financial offers available at this time.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Offers Section -->
+            {% if financial_offer and (financial_offer.get('credit') or financial_offer.get('insurance')) %}
+            <div class="offers-section">
+                <h3>Available Offers</h3>
+
+                <div class="offers-grid">
+                    <!-- Credit Offer -->
+                    {% if financial_offer.get('credit') %}
+                    <div class="offer-card credit">
+                        <div class="offer-card-title">
+                            💳 GrabCredit
+                        </div>
+
+                        <div class="offer-detail">
+                            <div class="offer-detail-label">Credit Limit</div>
+                            <div class="offer-detail-value">
+                                ₹{{ "{:,}".format((financial_offer.credit.credit_limit_lakhs * 100000)|int) }}
+                            </div>
+                            <small style="color: #7f8c8d;">{{ financial_offer.credit.credit_limit_lakhs }} Lakhs</small>
+                        </div>
+
+                        <div class="offer-detail">
+                            <div class="offer-detail-label">Interest Rate</div>
+                            <div class="offer-detail-value">
+                                {{ financial_offer.credit.interest_rate_percent }}% <span style="font-size: 0.9rem;">p.a.</span>
+                            </div>
+                        </div>
+
+                        <div class="offer-detail">
+                            <div class="offer-detail-label">Tenure Options</div>
+                            <div class="offer-detail-value">
+                                {% for tenure in financial_offer.credit.tenure_options_months %}
+                                    <span style="display: inline-block; background: #e7f3ff; padding: 0.3rem 0.6rem; border-radius: 4px; margin-right: 0.5rem; font-size: 0.9rem; margin-bottom: 0.3rem;">
+                                        {{ tenure }}M
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Insurance Offer -->
+                    {% if financial_offer.get('insurance') %}
+                    <div class="offer-card insurance">
+                        <div class="offer-card-title">
+                            🛡️ GrabInsurance
+                        </div>
+
+                        <div class="offer-detail">
+                            <div class="offer-detail-label">Coverage Amount</div>
+                            <div class="offer-detail-value">
+                                ₹{{ "{:,}".format((financial_offer.insurance.coverage_amount_lakhs * 100000)|int) }}
+                            </div>
+                            <small style="color: #7f8c8d;">{{ financial_offer.insurance.coverage_amount_lakhs }} Lakhs</small>
+                        </div>
+
+                        <div class="offer-detail">
+                            <div class="offer-detail-label">Annual Premium</div>
+                            <div class="offer-detail-value">
+                                ₹{{ "{:,}".format(financial_offer.insurance.premium_amount|int) }}
+                            </div>
+                        </div>
+
+                        <div class="offer-detail">
+                            <div class="offer-detail-label">Policy Type</div>
+                            <div class="offer-detail-value">
+                                {{ financial_offer.insurance.policy_type }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif risk_score.decision != 'REJECTED' %}
+            <div class="no-offer">
+                <p>No financial offers available at this time. Please contact support for more details.</p>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            {% if 'APPROVED' in risk_score.decision %}
+            <div class="action-section">
+                <button class="btn-accept" onclick="acceptOffer()">
+                    ✓ Accept Offer
+                </button>
+                <button class="btn-reject" onclick="rejectOffer()">
+                    × Reject Offer
+                </button>
+            </div>
+            {% endif %}
+
+            <!-- Footer -->
+            <div class="footer-text">
+                <p>Questions about your offer? <a href="mailto:support@grab.com">Contact Support</a></p>
+                <p style="font-size: 0.8rem; margin-top: 0.5rem; color: #bdc3c7;">
+                    This offer is confidential and valid for 30 days.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function acceptOffer() {
+            const token = "{{ secure_token }}";
+            // TODO: Call backend endpoint to record acceptance
+            alert("Thank you for accepting the offer! Our team will contact you shortly.");
+            // POST /api/offer/{token}/accept
+        }
+
+        function rejectOffer() {
+            const token = "{{ secure_token }}";
+            // TODO: Call backend endpoint to record rejection
+            if (confirm("Are you sure you want to reject this offer?")) {
+                alert("Offer rejected. You can request another review anytime.");
+                // POST /api/offer/{token}/reject
+            }
+        }
+    </script>
+</body>
+</html>

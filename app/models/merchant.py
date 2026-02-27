@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, JSON
+from sqlalchemy import Column, Integer, String, Float, JSON, CHAR
 from app.db.base import Base
+from uuid import uuid4
 
 
 class Merchant(Base):
@@ -14,6 +15,8 @@ class Merchant(Base):
     # Core identification
     id = Column(Integer, primary_key=True, index=True)
     merchant_id = Column(String, unique=True, index=True, nullable=False)
+    secure_token = Column(CHAR(36), unique=True, index=True, nullable=False, default=lambda: str(uuid4()))
+    mobile_number = Column(String, nullable=True)  # e.g. +919876543210
     category = Column(String, nullable=True)  # e.g., "Electronics", "Fashion", "Food & Beverage"
     
     # Legacy fields (preserved for backward compatibility)

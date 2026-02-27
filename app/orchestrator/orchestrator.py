@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -9,7 +10,10 @@ from app.schemas.decision_schema import UnderwritingDecision
 from app.services.merchant_service import MerchantService
 from app.services.application_service import RiskScoreService
 from app.services.underwriting_agent import ClaudeUnderwritingAgent
-from app.services.whatsapp_service import WhatsAppService
+from app.services.whatsapp_service import WhatsAppService, normalize_wa_number
+from app.services.config_service import get_config
+from app.models.risk_score import RiskScore
+from app.models.merchant import Merchant as MerchantModel
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +80,10 @@ class Orchestrator:
             merchant_data=merchant.dict(),
             risk_score=risk_result["score"],
             risk_tier=risk_tier,
-            decision=decision
+            decision=decision,
+            category_benchmark=risk_result.get("category_benchmark", {}),
+            gmv_yoy_pct=risk_result.get("gmv_yoy_pct"),
+            score_breakdown=risk_result.get("score_breakdown", {}),
         )
         
         # Step 6: Construct UnderwritingResult with AI explanation and financial offer
@@ -93,27 +100,68 @@ class Orchestrator:
         RiskScoreService.create_risk_record(db, underwriting_decision)
         
         # Step 8: Send WhatsApp notification (non-blocking, doesn't affect API response)
-        if whatsapp_number:
-            try:
-                whatsapp_service = WhatsAppService()
-                result = whatsapp_service.send_underwriting_result(
-                    to_number=whatsapp_number,
-                    merchant_id=merchant.merchant_id,
-                    risk_tier=risk_tier,
-                    decision=decision,
-                    risk_score=risk_result["score"],
-                    explanation=ai_explanation
-                )
-                logger.info(
-                    f"WhatsApp notification sent | Merchant: {merchant.merchant_id} | "
-                    f"SID: {result.get('sid')} | Status: {result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to send WhatsApp notification for {merchant.merchant_id}: {e}",
-                    exc_info=True
-                )
-                # Do not raise - API response should not be affected by WhatsApp failure
+        # Skip if underwriting_mode is MANUAL — admin will send manually via dashboard
+        underwriting_mode = get_config(db, "underwriting_mode", "AUTO")
+
+        if whatsapp_number and underwriting_mode == "AUTO":
+            # Respect test-mode override
+            test_override_enabled = get_config(db, "test_mobile_override_enabled", "false")
+            test_mobile_number = get_config(db, "test_mobile_number", "")
+            raw_dest = whatsapp_number
+            if test_override_enabled == "true" and test_mobile_number:
+                raw_dest = test_mobile_number
+                logger.info(f"[TestMode] Overriding WhatsApp number to {raw_dest}")
+
+            send_to = normalize_wa_number(raw_dest)
+            if not send_to:
+                logger.warning(f"[WhatsApp] Invalid destination '{raw_dest}' for {merchant.merchant_id} — skipping")
+            else:
+                try:
+                    # Fetch saved merchant record to get secure_token for offer link
+                    saved_merchant = db.query(MerchantModel).filter_by(
+                        merchant_id=merchant.merchant_id
+                    ).first()
+                    base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+                    offer_link = (
+                        f"{base_url}/offer/{saved_merchant.secure_token}"
+                        if saved_merchant and getattr(saved_merchant, "secure_token", None)
+                        else ""
+                    )
+
+                    # Serialize financial_offer to plain dict for message formatter
+                    fo_dict = financial_offer.dict() if financial_offer and hasattr(financial_offer, "dict") else {}
+
+                    whatsapp_service = WhatsAppService()
+                    result = whatsapp_service.send_underwriting_result(
+                        to_number=send_to,
+                        merchant_id=merchant.merchant_id,
+                        merchant_name=getattr(merchant, "business_name", "") or merchant.merchant_id,
+                        risk_tier=risk_tier,
+                        decision=decision,
+                        risk_score=risk_result["score"],
+                        explanation=ai_explanation,
+                        financial_offer=fo_dict,
+                        secure_offer_link=offer_link,
+                    )
+                    # Update whatsapp_status on the saved risk record
+                    saved_record = db.query(RiskScore).filter(
+                        RiskScore.merchant_id == merchant.merchant_id
+                    ).order_by(RiskScore.id.desc()).first()
+                    if saved_record:
+                        wa_status = result.get("status", "failed")
+                        saved_record.whatsapp_status = "SENT" if wa_status in ("queued", "sent", "delivered") else "FAILED"
+                        db.commit()
+                    logger.info(
+                        f"WhatsApp notification sent | Merchant: {merchant.merchant_id} | "
+                        f"SID: {result.get('sid')} | Status: {result.get('status')}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send WhatsApp notification for {merchant.merchant_id}: {e}",
+                        exc_info=True
+                    )
+        elif underwriting_mode == "MANUAL":
+            logger.info(f"Underwriting mode is MANUAL — skipping auto WhatsApp for {merchant.merchant_id}")
         
         # Step 9: Return decision
         return underwriting_decision

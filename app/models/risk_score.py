@@ -19,4 +19,6 @@ class RiskScore(Base):
     explanation = Column(String, nullable=False)
     financial_offer = Column(Text, nullable=True)  # JSON-serialized FinancialOffer (optional)
     offer_status = Column(String, default="PENDING", nullable=False)  # PENDING | ACCEPTED | REJECTED
+    whatsapp_status = Column(String, default="NOT_SENT", nullable=True)  # NOT_SENT | SENT | FAILED
+    decision_source = Column(String, default="AGENT", nullable=True)   # AGENT | ADMIN
 

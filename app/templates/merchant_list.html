@@ -1,257 +1,296 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ page_title }} - GrabCredit</title>
+    <title>GrabCredit Admin Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #f5a623;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --danger-color: #e74c3c;
+            --grab-orange: #f5a623;
+            --grab-dark:   #1a2035;
+            --success:     #27ae60;
+            --muted:       #6c757d;
         }
-        
-        body {
-            background-color: #f8f9fa;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, oxygen, Ubuntu, Cantarell, sans-serif;
+
+        body { background: #f4f6fb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+        .topnav {
+            background: var(--grab-dark);
+            padding: 0 1.5rem;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
         }
-        
-        .navbar-custom {
-            background-color: var(--primary-color);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .topnav-brand { color: white; font-weight: 800; font-size: 1.1rem; }
+        .topnav-brand span { color: var(--grab-orange); }
+
+        .mode-badge {
+            font-size: 0.78rem; font-weight: 700;
+            padding: 0.3rem 0.75rem; border-radius: 20px; letter-spacing: 0.5px;
         }
-        
-        .navbar-custom .navbar-brand {
-            font-weight: 700;
-            font-size: 1.3rem;
-            color: white !important;
+        .mode-auto   { background: #d4f8e8; color: #0d6e3b; }
+        .mode-manual { background: #fff3cd; color: #856404; }
+
+        .page-wrap { max-width: 1200px; margin: 0 auto; padding: 1.8rem 1rem 4rem; }
+
+        .engine-card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            padding: 1.5rem 2rem; margin-bottom: 1.5rem;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 1rem;
         }
-        
-        .navbar-custom a {
-            color: white !important;
+        .engine-card-left h2 { font-size: 1.1rem; font-weight: 800; color: var(--grab-dark); margin: 0 0 0.25rem; }
+        .engine-card-left p  { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+        .btn-engine {
+            background: linear-gradient(135deg, var(--grab-orange), #ff7b2f);
+            color: white; border: none; padding: 0.75rem 2rem;
+            border-radius: 30px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; box-shadow: 0 4px 16px rgba(245,166,35,0.4);
+            transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap;
         }
-        
-        .container-main {
-            padding: 2rem 0;
+        .btn-engine:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(245,166,35,0.55); }
+
+        .engine-summary {
+            background: linear-gradient(135deg, #eafaf1, #d4f8e8);
+            border-left: 4px solid var(--success); border-radius: 10px;
+            padding: 1rem 1.5rem; margin-bottom: 1.5rem;
+            display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
         }
-        
-        .page-header {
-            margin-bottom: 2rem;
+        .summary-icon { font-size: 1.8rem; }
+        .summary-title { font-size: 0.85rem; font-weight: 800; color: #0d5e33; margin-bottom: 0.5rem; }
+        .summary-stats { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .stat-chip {
+            background: white; border-radius: 20px; padding: 0.3rem 0.8rem;
+            font-size: 0.82rem; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,0.08); color: var(--grab-dark);
         }
-        
-        .page-header h1 {
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
+        .stat-chip.ok     { color: #0d6e3b; }
+        .stat-chip.reject { color: #922020; }
+        .stat-chip.wa     { color: #1a56db; }
+        .stat-chip.warn   { color: #856404; }
+
+        .section-label {
+            font-size: 0.7rem; font-weight: 800; letter-spacing: 2px;
+            text-transform: uppercase; color: #95a5a6; margin-bottom: 0.75rem;
         }
-        
-        .merchants-table {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .table {
-            margin-bottom: 0;
-        }
-        
+
+        .table-card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+        .table { margin-bottom: 0; }
         .table th {
-            background-color: #f5f6fa;
-            border-bottom: 2px solid #e0e6ed;
-            font-weight: 600;
-            color: #2c3e50;
-            padding: 1.2rem;
+            background: #f7f8fa; padding: 0.9rem 1rem;
+            font-size: 0.75rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1px; color: #7f8c8d; border-bottom: 2px solid #e8eaed;
         }
-        
-        .table td {
-            padding: 1.2rem;
-            vertical-align: middle;
-            border-bottom: 1px solid #e0e6ed;
+        .table td { padding: 0.85rem 1rem; vertical-align: middle; border-bottom: 1px solid #f0f2f5; font-size: 0.9rem; }
+        .table tbody tr:hover { background: #fafbff; }
+        .table tbody tr:last-child td { border-bottom: none; }
+
+        .pill {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            padding: 0.28rem 0.7rem; border-radius: 20px;
+            font-size: 0.76rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
         }
-        
-        .table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .tier-badge {
-            display: inline-block;
-            padding: 0.4rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .tier-1 {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .tier-2 {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        
-        .tier-3 {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .decision-badge {
-            display: inline-block;
-            padding: 0.4rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .decision-approved {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .decision-conditions {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        
-        .decision-rejected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
+        .tier-1   { background: #d4f8e8; color: #0d6e3b; }
+        .tier-2   { background: #fff3cd; color: #856404; }
+        .tier-3   { background: #fde8e8; color: #922020; }
+        .d-approved   { background: #d4f8e8; color: #0d6e3b; }
+        .d-conditions { background: #fff3cd; color: #856404; }
+        .d-rejected   { background: #fde8e8; color: #922020; }
+        .wa-sent    { background: #e8f0fe; color: #1a56db; }
+        .wa-failed  { background: #fde8e8; color: #922020; }
+        .wa-pending { background: #f0f0f0; color: #555; }
+
+        .score-val { font-weight: 800; color: var(--grab-orange); font-size: 1rem; }
+
         .btn-view {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-            font-weight: 600;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            text-decoration: none;
-            transition: all 0.2s;
+            background: var(--grab-orange); color: white; border: none;
+            padding: 0.4rem 1rem; border-radius: 6px;
+            font-size: 0.82rem; font-weight: 700; text-decoration: none;
+            transition: background 0.15s, transform 0.1s;
         }
-        
-        .btn-view:hover {
-            background-color: #e89a1f;
-            text-decoration: none;
-            color: white;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        .btn-view:hover { background: #e6920e; color: white; transform: translateY(-1px); }
+
+        /* ── Mobile inline edit ── */
+        .mobile-display {
+            display: flex; align-items: center; gap: 0.35rem; cursor: pointer;
         }
-        
-        .empty-state {
-            text-align: center;
-            padding: 3rem 2rem;
-            background: white;
-            border-radius: 8px;
-            color: #7f8c8d;
+        .mobile-num   { font-size: 0.82rem; color: var(--grab-dark); }
+        .mobile-empty { font-size: 0.78rem; color: #aaa; font-style: italic; }
+        .btn-mobile-edit {
+            background: none; border: none; font-size: 0.7rem; color: #bbb;
+            cursor: pointer; padding: 0 2px; line-height: 1;
+            opacity: 0; transition: opacity 0.15s;
         }
-        
-        .empty-state p {
-            margin-bottom: 0;
+        .mobile-cell:hover .btn-mobile-edit { opacity: 1; }
+        .mobile-edit {
+            display: none; align-items: center; gap: 0.3rem;
         }
-        
-        .score-display {
-            font-weight: 700;
-            color: var(--primary-color);
-            font-size: 1.1rem;
+        .mobile-input {
+            width: 140px; padding: 0.25rem 0.45rem;
+            border: 1.5px solid var(--grab-orange); border-radius: 5px;
+            font-size: 0.82rem; outline: none;
         }
-        
-        .footer-nav {
-            margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 1px solid #e0e6ed;
-            text-align: center;
-            color: #7f8c8d;
+        .mobile-input:focus { box-shadow: 0 0 0 2px rgba(245,166,35,0.25); }
+        .btn-mobile-save, .btn-mobile-cancel {
+            background: none; border: none; cursor: pointer;
+            font-size: 0.95rem; padding: 0 3px; line-height: 1;
         }
+        .btn-mobile-save   { color: #27ae60; }
+        .btn-mobile-cancel { color: #e74c3c; }
+
+        .config-card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            padding: 1.25rem 1.5rem; margin-top: 1.5rem;
+        }
+        .config-title { font-size: 0.7rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #95a5a6; margin-bottom: 1rem; }
+        .config-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 600px) { .config-grid { grid-template-columns: 1fr; } }
+
+        .empty-state { text-align: center; padding: 3rem; color: var(--muted); }
+        .page-foot { text-align: center; color: #bbb; font-size: 0.8rem; margin-top: 2.5rem; }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-custom">
-        <div class="container-lg">
-            <span class="navbar-brand">📊 GrabCredit AI Underwriting</span>
-            <div class="navbar-nav ms-auto">
-                <span class="nav-item nav-text" style="color: white; font-size: 0.9rem;">
-                    Dashboard
-                </span>
+
+    <div class="topnav">
+        <div class="topnav-brand">📊 <span>Grab</span>Credit AI Underwriting</div>
+        <span class="mode-badge {% if underwriting_mode == 'AUTO' %}mode-auto{% else %}mode-manual{% endif %}">
+            {% if underwriting_mode == 'AUTO' %}⚡ AUTO{% else %}🖐 MANUAL{% endif %}
+        </span>
+    </div>
+
+    <div class="page-wrap">
+
+        <!-- Engine Control Card -->
+        <div class="engine-card">
+            <div class="engine-card-left">
+                <h2>🚀 Underwriting Engine</h2>
+                <p>
+                    Process all {{ merchants_data|length }} merchants — generate risk decisions, financial offers,
+                    {% if underwriting_mode == 'AUTO' %}and auto-send WhatsApp offers.{% else %}and save decisions (WhatsApp send is manual per merchant).{% endif %}
+                </p>
+            </div>
+            <form method="POST" action="/admin/run-engine" style="margin:0;">
+                <button type="submit" class="btn-engine" onclick="this.textContent='⏳ Running…';this.disabled=true;">
+                    🚀 Start Underwriting Engine
+                </button>
+            </form>
+        </div>
+
+        <!-- Engine Summary Banner -->
+        {% if engine_summary %}
+        <div class="engine-summary">
+            <div class="summary-icon">✅</div>
+            <div>
+                <div class="summary-title">Engine Run Complete</div>
+                <div class="summary-stats">
+                    <span class="stat-chip">📋 {{ engine_summary.processed }} processed</span>
+                    <span class="stat-chip ok">✅ {{ engine_summary.approved }} approved</span>
+                    <span class="stat-chip reject">❌ {{ engine_summary.rejected }} rejected</span>
+                    <span class="stat-chip wa">📲 {{ engine_summary.wa_sent }} WA sent</span>
+                    {% if engine_summary.wa_failed > 0 %}
+                    <span class="stat-chip warn">⚠ {{ engine_summary.wa_failed }} WA failed</span>
+                    {% endif %}
+                    {% if engine_summary.wa_skipped > 0 %}
+                    <span class="stat-chip">⏭ {{ engine_summary.wa_skipped }} WA skipped</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    </nav>
+        {% endif %}
 
-    <!-- Main Content -->
-    <div class="container-lg container-main">
-        <!-- Page Header -->
-        <div class="page-header">
-            <h1>Merchant Underwriting Dashboard</h1>
-            <p class="text-muted">View all merchants and their underwriting decisions</p>
-        </div>
-
-        <!-- Merchants Table -->
+        <!-- Merchant Table -->
+        <div class="section-label">Merchant Portfolio</div>
         {% if merchants_data %}
-        <div class="merchants-table">
+        <div class="table-card">
             <table class="table">
                 <thead>
                     <tr>
-                        <th style="width: 15%">Merchant ID</th>
-                        <th style="width: 15%">Monthly Revenue</th>
-                        <th style="width: 12%">Credit Score</th>
-                        <th style="width: 12%">Risk Tier</th>
-                        <th style="width: 15%">Decision</th>
-                        <th style="width: 10%">Score</th>
-                        <th style="width: 12%">Action</th>
+                        <th>Merchant ID</th>
+                        <th>Category</th>
+                        <th>Revenue / mo</th>
+                        <th>Credit Score</th>
+                        <th>Mobile Number</th>
+                        <th>Risk Tier</th>
+                        <th>Decision</th>
+                        <th>Score</th>
+                        <th>WA</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in merchants_data %}
-                    {% set merchant = item.merchant %}
-                    {% set risk_score = item.risk_score %}
+                    {% set m = item.merchant %}
+                    {% set rs = item.risk_score %}
                     <tr>
-                        <td>
-                            <strong>{{ merchant.merchant_id }}</strong>
+                        <td><strong style="color:#1a2035;">{{ m.merchant_id }}</strong></td>
+                        <td style="color:#555;">{{ m.category or '—' }}</td>
+                        <td>₹{{ "{:,}".format(m.monthly_revenue|int) }}</td>
+                        <td>{{ m.credit_score }}</td>
+                        <td class="mobile-cell" data-merchant="{{ m.merchant_id }}">
+                            <div class="mobile-display">
+                                {% if m.mobile_number %}
+                                <span class="mobile-num">{{ m.mobile_number }}</span>
+                                {% else %}
+                                <span class="mobile-empty">+ add number</span>
+                                {% endif %}
+                                <button class="btn-mobile-edit" title="Edit">✏</button>
+                            </div>
+                            <div class="mobile-edit">
+                                <input type="tel" class="mobile-input" placeholder="+91XXXXXXXXXX" value="{{ m.mobile_number or '' }}">
+                                <button class="btn-mobile-save" title="Save">✓</button>
+                                <button class="btn-mobile-cancel" title="Cancel">✗</button>
+                            </div>
                         </td>
-                        <td>${{ "{:,}".format(merchant.monthly_revenue|int) }}</td>
-                        <td>{{ merchant.credit_score }}</td>
                         <td>
-                            {% if risk_score %}
-                                <span class="tier-badge {% if risk_score.risk_tier == 'Tier 1' %}tier-1{% elif risk_score.risk_tier == 'Tier 2' %}tier-2{% else %}tier-3{% endif %}">
-                                    {{ risk_score.risk_tier }}
-                                </span>
+                            {% if rs %}
+                            <span class="pill {% if rs.risk_tier == 'Tier 1' %}tier-1{% elif rs.risk_tier == 'Tier 2' %}tier-2{% else %}tier-3{% endif %}">
+                                {{ rs.risk_tier }}
+                            </span>
+                            {% else %}<span style="color:#ccc;">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if rs %}
+                            {% if 'APPROVED' in rs.decision and 'CONDITIONS' not in rs.decision %}
+                              <span class="pill d-approved">Approved</span>
+                            {% elif 'CONDITIONS' in rs.decision %}
+                              <span class="pill d-conditions">Conditional</span>
                             {% else %}
-                                <span class="text-muted">—</span>
+                              <span class="pill d-rejected">Rejected</span>
                             {% endif %}
+                            {% else %}<span style="color:#ccc;">—</span>{% endif %}
                         </td>
                         <td>
-                            {% if risk_score %}
-                                {% set decision_class = 'decision-approved' if 'APPROVED' in risk_score.decision else ('decision-conditions' if 'CONDITIONS' in risk_score.decision else 'decision-rejected') %}
-                                <span class="decision-badge {{ decision_class }}">
-                                    {% if risk_score.decision == 'APPROVED_WITH_CONDITIONS' %}
-                                        Conditions
-                                    {% else %}
-                                        {{ risk_score.decision }}
-                                    {% endif %}
-                                </span>
+                            {% if rs %}<span class="score-val">{{ rs.risk_score }}</span>
+                            {% else %}<span style="color:#ccc;">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if rs %}
+                            {% set wa = rs.whatsapp_status or 'NOT_SENT' %}
+                            {% if wa == 'SENT' %}
+                              <span class="pill wa-sent">📲</span>
+                            {% elif wa == 'FAILED' %}
+                              <span class="pill wa-failed">✗</span>
                             {% else %}
-                                <span class="text-muted">—</span>
+                              <span class="pill wa-pending">–</span>
                             {% endif %}
+                            {% else %}<span style="color:#ccc;">—</span>{% endif %}
                         </td>
                         <td>
-                            {% if risk_score %}
-                                <span class="score-display">{{ risk_score.risk_score }}/100</span>
-                            {% else %}
-                                <span class="text-muted">—</span>
+                            <a href="/dashboard/{{ m.merchant_id }}" class="btn-view">View</a>
+                            {% if rs %}
+                            <form method="POST" action="/dashboard/{{ m.merchant_id }}/send-offer" style="display:inline;margin-left:4px;">
+                                <button type="submit" title="Send offer via WhatsApp"
+                                    style="padding:0.28rem 0.55rem;background:#25D366;color:white;border:none;border-radius:5px;font-size:0.78rem;cursor:pointer;line-height:1.2;">
+                                    📲
+                                </button>
+                            </form>
                             {% endif %}
-                        </td>
-                        <td>
-                            <a href="/dashboard/{{ merchant.merchant_id }}" class="btn-view">
-                                View
-                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -259,27 +298,138 @@
             </table>
         </div>
         {% else %}
-        <div class="empty-state">
-            <p>No merchants found. Process underwriting requests via API to populate this list.</p>
+        <div class="table-card empty-state">
+            <p>📭 No merchants found. Run the engine to populate the portfolio.</p>
         </div>
         {% endif %}
 
-        <!-- Footer -->
-        <div class="footer-nav">
-            <p>
-                <small>
-                    Total Merchants: <strong>{{ merchants_data|length }}</strong> |
-                    Last Updated: <strong>{{ now() }}</strong>
-                </small>
-            </p>
+        <!-- System Config -->
+        <div class="config-card">
+            <div class="config-title">⚙ System Configuration</div>
+            <div class="config-grid">
+
+                <div>
+                    <form method="POST" action="/dashboard/config/test-mode">
+                        <p style="font-size:0.85rem;font-weight:700;margin-bottom:0.6rem;">🧪 WhatsApp Test Override</p>
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
+                            <input type="checkbox" name="test_override_enabled" value="true" id="chk_test"
+                                {% if test_override_enabled == 'true' %}checked{% endif %}>
+                            <label for="chk_test" style="font-size:0.85rem;cursor:pointer;">
+                                Route <strong>all</strong> WA sends to test number
+                                {% if test_override_enabled == 'true' %}<span style="color:#0d6e3b;font-weight:700;"> (ON)</span>{% endif %}
+                            </label>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input type="text" name="test_mobile_number"
+                                placeholder="+91XXXXXXXXXX"
+                                value="{{ test_mobile_number or '' }}"
+                                style="flex:1;padding:0.4rem 0.7rem;border:1.5px solid {% if test_override_enabled == 'true' %}#f5a623{% else %}#ddd{% endif %};border-radius:6px;font-size:0.85rem;">
+                            <button type="submit" style="padding:0.4rem 0.9rem;background:{% if test_override_enabled == 'true' %}#f5a623{% else %}#555{% endif %};color:white;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;">Save</button>
+                        </div>
+                        {% if test_override_enabled == 'true' and test_mobile_number %}
+                        <p style="margin:0.4rem 0 0;font-size:0.78rem;color:#0d6e3b;">✅ All WA → {{ test_mobile_number }}</p>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <div>
+                    <form method="POST" action="/dashboard/config/underwriting-mode">
+                        <p style="font-size:0.85rem;font-weight:700;margin-bottom:0.6rem;">⚡ Underwriting Send Mode</p>
+                        <label style="display:block;font-size:0.85rem;margin-bottom:0.4rem;cursor:pointer;">
+                            <input type="radio" name="underwriting_mode" value="AUTO"
+                                {% if underwriting_mode == 'AUTO' %}checked{% endif %}> AUTO — send WhatsApp automatically
+                        </label>
+                        <label style="display:block;font-size:0.85rem;margin-bottom:0.6rem;cursor:pointer;">
+                            <input type="radio" name="underwriting_mode" value="MANUAL"
+                                {% if underwriting_mode == 'MANUAL' %}checked{% endif %}> MANUAL — admin sends per merchant
+                        </label>
+                        <button type="submit" style="padding:0.4rem 0.9rem;background:#555;color:white;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;">Save Mode</button>
+                    </form>
+                </div>
+
+            </div>
         </div>
+
+        <div class="page-foot">GrabCredit AI Underwriting &middot; {{ merchants_data|length }} merchants &middot; {{ now() }}</div>
+
     </div>
 
-    <!-- Footer -->
-    <footer style="background-color: #2c3e50; color: white; padding: 2rem 0; margin-top: 3rem; text-align: center;">
-        <p style="margin-bottom: 0;"><small>GrabCredit AI Underwriting Agent | Production Dashboard</small></p>
-    </footer>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // ── Inline mobile number editor ───────────────────────────────────────────
+    document.querySelectorAll('.mobile-cell').forEach(cell => {
+        const merchantId = cell.dataset.merchant;
+        const displayDiv = cell.querySelector('.mobile-display');
+        const editDiv    = cell.querySelector('.mobile-edit');
+        const input      = cell.querySelector('.mobile-input');
+        const editBtn    = cell.querySelector('.btn-mobile-edit');
+        const saveBtn    = cell.querySelector('.btn-mobile-save');
+        const cancelBtn  = cell.querySelector('.btn-mobile-cancel');
+
+        function showEdit() {
+            displayDiv.style.display = 'none';
+            editDiv.style.display = 'flex';
+            input.focus();
+            input.select();
+        }
+
+        function showDisplay(newNum) {
+            editDiv.style.display = 'none';
+            displayDiv.style.display = 'flex';
+            if (newNum !== undefined) {
+                let span = displayDiv.querySelector('.mobile-num, .mobile-empty');
+                if (!span) {
+                    span = document.createElement('span');
+                    displayDiv.insertBefore(span, editBtn);
+                }
+                span.className = newNum ? 'mobile-num' : 'mobile-empty';
+                span.textContent = newNum || '+ add number';
+            }
+        }
+
+        // Trigger edit on icon click or double-click on the number
+        editBtn.addEventListener('click', e => { e.stopPropagation(); showEdit(); });
+        displayDiv.addEventListener('dblclick', showEdit);
+
+        cancelBtn.addEventListener('click', () => showDisplay());
+
+        async function doSave() {
+            const num = input.value.trim();
+            const origText = saveBtn.textContent;
+            saveBtn.textContent = '⏳';
+            saveBtn.disabled = true;
+
+            const fd = new FormData();
+            fd.append('mobile_number', num);
+
+            try {
+                const resp = await fetch(`/dashboard/${merchantId}/mobile-inline`, {
+                    method: 'POST', body: fd
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    showDisplay(num);
+                    cell.style.background = '#d4f8e8';
+                    setTimeout(() => { cell.style.background = ''; cell.style.transition = 'background 0.8s'; }, 800);
+                } else {
+                    alert('Save failed: ' + (data.error || 'Unknown'));
+                    showDisplay();
+                }
+            } catch(e) {
+                alert('Network error — could not save number');
+                showDisplay();
+            }
+
+            saveBtn.textContent = origText;
+            saveBtn.disabled = false;
+        }
+
+        saveBtn.addEventListener('click', doSave);
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter')  doSave();
+            if (e.key === 'Escape') showDisplay();
+        });
+    });
+    </script>
 </body>
 </html>

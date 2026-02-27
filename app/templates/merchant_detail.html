@@ -71,7 +71,14 @@
         }
         
         .section-title {
-            font-size: 1.2rem;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #95a5a6;
+            margin-bottom: 1.1rem;
+        }
+                    font-size: 1.2rem;
             font-weight: 700;
             color: #2c3e50;
             margin-bottom: 1.5rem;
@@ -110,13 +117,14 @@
         
         .tier-badge-large {
             display: inline-block;
-            padding: 0.6rem 1.2rem;
-            border-radius: 20px;
-            font-size: 1rem;
-            font-weight: 700;
+            padding: 0.45rem 1.1rem;
+            border-radius: 50px;
+            font-size: 0.82rem;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1rem;
+            letter-spacing: 1.5px;
+            margin-bottom: 0.9rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }
         
         .tier-1 {
@@ -170,31 +178,23 @@
             font-size: 1rem;
         }
         
-        .offer-status {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-transform: uppercase;
+        /* ── Consistent status pill ── */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.38rem 0.9rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 700;
             letter-spacing: 0.5px;
-            margin-bottom: 1.5rem;
+            text-transform: uppercase;
         }
-        
-        .offer-pending {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        
-        .offer-accepted {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .offer-rejected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
+        /* Offer status */
+        .offer-status  { display: inline-block; padding: 0.38rem 0.9rem; border-radius: 50px; font-size: 0.8rem; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
+        .offer-pending  { background:#fff3cd; color:#856404; }
+        .offer-accepted { background:#d4f8e8; color:#0d6e3b; }
+        .offer-rejected { background:#fde8e8; color:#922020; }
         
         .button-group {
             display: flex;
@@ -250,13 +250,19 @@
         }
         
         .alert-success-custom {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-            padding: 1rem;
-            border-radius: 6px;
+            background: linear-gradient(135deg, #eafaf1, #d4f8e8);
+            border-left: 4px solid #27ae60;
+            color: #0d5e33;
+            padding: 0.9rem 1.2rem;
+            border-radius: 8px;
             margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 600;
+            font-size: 0.93rem;
         }
+        .alert-success-custom::before { content: '✅'; font-size: 1rem; }
         
         .footer-nav {
             margin-top: 3rem;
@@ -434,10 +440,78 @@
         </div>
         {% endif %}
 
+        <!-- Merchant Dropdown Selector -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="font-weight:600;color:#2c3e50;margin-bottom:0.5rem;display:block;">Switch Merchant</label>
+            <select onchange="window.location.href='/dashboard/'+this.value"
+                    style="padding:0.5rem 1rem;border-radius:6px;border:1px solid #ddd;font-size:0.95rem;min-width:260px;">
+                {% for m in all_merchants %}
+                <option value="{{ m.merchant_id }}" {% if m.merchant_id == merchant.merchant_id %}selected{% endif %}>
+                    {{ m.merchant_id }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
         <!-- Page Header -->
         <div class="page-header">
             <h1>Merchant Details</h1>
             <p class="text-muted">Complete underwriting assessment and decision</p>
+        </div>
+
+        <!-- System Settings Panel -->
+        <div class="card-section" style="background:#f8f9fa;border:1px solid #dee2e6;">
+            <h2 class="section-title">⚙️ System Settings</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
+
+                <!-- WhatsApp Test Mode -->
+                <div>
+                    <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.75rem;">🧪 WhatsApp Test Mode</h4>
+                    <form method="POST" action="/dashboard/config/test-mode">
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+                            <input type="checkbox" name="test_override_enabled" value="true" id="test_override_check"
+                                {% if test_override_enabled == 'true' %}checked{% endif %}
+                                style="width:1.1rem;height:1.1rem;cursor:pointer;">
+                            <label for="test_override_check" style="font-size:0.9rem;cursor:pointer;">Override all sends to test number</label>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input type="text" name="test_mobile_number" value="{{ test_mobile_number }}"
+                                placeholder="+91XXXXXXXXXX"
+                                style="flex:1;padding:0.45rem 0.75rem;border:1px solid #ced4da;border-radius:4px;font-size:0.88rem;">
+                            <button type="submit"
+                                style="padding:0.45rem 1rem;background:#6c757d;color:white;border:none;border-radius:4px;font-size:0.88rem;cursor:pointer;">Save</button>
+                        </div>
+                        <small style="color:#6c757d;display:block;margin-top:0.4rem;">When enabled, ALL WhatsApp messages go to this test number instead of the merchant's number.</small>
+                    </form>
+                </div>
+
+                <!-- Underwriting Mode -->
+                <div>
+                    <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.75rem;">🤖 Underwriting Auto-Send Mode</h4>
+                    <form method="POST" action="/dashboard/config/underwriting-mode">
+                        <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;cursor:pointer;">
+                                <input type="radio" name="underwriting_mode" value="AUTO"
+                                    {% if underwriting_mode == 'AUTO' %}checked{% endif %}>
+                                AUTO — send WhatsApp automatically after underwriting
+                            </label>
+                        </div>
+                        <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;cursor:pointer;">
+                                <input type="radio" name="underwriting_mode" value="MANUAL"
+                                    {% if underwriting_mode == 'MANUAL' %}checked{% endif %}>
+                                MANUAL — send via "Send Offer Now" button only
+                            </label>
+                        </div>
+                        <button type="submit"
+                            style="padding:0.45rem 1rem;background:#6c757d;color:white;border:none;border-radius:4px;font-size:0.88rem;cursor:pointer;">Save Mode</button>
+                    </form>
+                    <small style="color:#6c757d;display:block;margin-top:0.4rem;">
+                        Current: <strong>{{ underwriting_mode }}</strong>
+                    </small>
+                </div>
+
+            </div>
         </div>
 
         <!-- Merchant Info Section -->
@@ -474,6 +548,25 @@
                     <div class="info-label">Past Defaults</div>
                     <div class="info-value">{{ merchant.past_defaults }}</div>
                 </div>
+            </div>
+
+            <!-- Inline Mobile Number Edit -->
+            <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid #f0f0f0;">
+                <h3 style="font-size:1rem;font-weight:700;color:#2c3e50;margin-bottom:1rem;">Contact Information</h3>
+                <form method="POST" action="/dashboard/{{ merchant.merchant_id }}/update-mobile"
+                      style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div>
+                        <label style="font-size:0.85rem;font-weight:600;color:#7f8c8d;display:block;margin-bottom:0.3rem;">WhatsApp / Mobile Number</label>
+                        <input type="text" name="mobile_number"
+                               value="{{ merchant.mobile_number or '' }}"
+                               placeholder="+91XXXXXXXXXX"
+                               style="padding:0.5rem 0.75rem;border:1px solid #ddd;border-radius:6px;font-size:0.95rem;min-width:220px;" />
+                    </div>
+                    <button type="submit"
+                            style="background:#f5a623;color:white;border:none;padding:0.5rem 1.25rem;border-radius:6px;font-weight:600;cursor:pointer;margin-top:1.3rem;">
+                        💾 Save
+                    </button>
+                </form>
             </div>
         </div>
 
@@ -517,10 +610,29 @@
                 </div>
             </div>
             
-            <!-- Offer Status -->
+            <!-- Offer Status + WhatsApp Badge + Decision Source -->
             {% if risk_score.decision != 'REJECTED' %}
-            <div class="offer-status {% if risk_score.offer_status == 'ACCEPTED' %}offer-accepted{% elif risk_score.offer_status == 'REJECTED' %}offer-rejected{% else %}offer-pending{% endif %}">
-                Offer Status: {{ risk_score.offer_status }}
+            <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;margin-top:1rem;">
+
+                <span class="status-pill offer-status {% if risk_score.offer_status == 'ACCEPTED' %}offer-accepted{% elif risk_score.offer_status == 'REJECTED' %}offer-rejected{% else %}offer-pending{% endif %}">
+                    {% if risk_score.offer_status == 'ACCEPTED' %}✅{% elif risk_score.offer_status == 'REJECTED' %}❌{% else %}⏳{% endif %}
+                    {{ risk_score.offer_status }}
+                </span>
+
+                {% if risk_score.whatsapp_status == 'SENT' %}
+                <span class="status-pill" style="background:#d4f8e8;color:#0d6e3b;">📲 WA Sent</span>
+                {% elif risk_score.whatsapp_status == 'FAILED' %}
+                <span class="status-pill" style="background:#fde8e8;color:#922020;">❌ WA Failed</span>
+                {% else %}
+                <span class="status-pill" style="background:#f0f0f0;color:#555;">⏳ WA Pending</span>
+                {% endif %}
+
+                {% if risk_score.decision_source == 'ADMIN' %}
+                <span class="status-pill" style="background:#e8f0fe;color:#1a56db;">🛠 Admin</span>
+                {% else %}
+                <span class="status-pill" style="background:#fef9c3;color:#713f12;">🤖 Agent</span>
+                {% endif %}
+
             </div>
             {% endif %}
         </div>
@@ -697,36 +809,135 @@
         {% if risk_score.decision != 'REJECTED' and risk_score.offer_status == 'PENDING' %}
         <div class="card-section">
             <h2 class="section-title">Merchant Actions</h2>
-            
-            <p>This merchant can accept or decline the credit offer.</p>
-            
+            <p style="font-size:0.9rem; color:#7f8c8d;">Accept the offer to register a mock NACH mandate and trigger an acceptance confirmation via WhatsApp.</p>
+
             <div class="button-group">
-                <form method="POST" action="/dashboard/{{ merchant.merchant_id }}/accept" style="display: inline;">
-                    <button type="submit" class="btn-primary-custom">
-                        Accept Offer
+                <!-- Opens NACH mandate modal instead of direct submit -->
+                <button type="button" class="btn-primary-custom" onclick="document.getElementById('nachModal').style.display='flex'">
+                    ✅ Accept Offer &amp; Register NACH
+                </button>
+
+                <form method="POST" action="/dashboard/{{ merchant.merchant_id }}/send-offer" style="display: inline;">
+                    <button type="submit"
+                        style="padding:0.7rem 1.5rem;background:#25D366;color:white;border:none;border-radius:6px;font-weight:600;font-size:0.9rem;cursor:pointer;">
+                        📲 Send Offer via WhatsApp
                     </button>
                 </form>
-                
-                <a href="/dashboard/" class="btn-secondary-custom">
-                    Back to Dashboard
-                </a>
+
+                <a href="/dashboard/" class="btn-secondary-custom">Back to Dashboard</a>
             </div>
         </div>
+
+        <!-- ── NACH Mandate Modal ──────────────────────────────────────── -->
+        <div id="nachModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
+            <div style="background:white; border-radius:14px; padding:2rem; max-width:520px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.25); position:relative;">
+                <button onclick="document.getElementById('nachModal').style.display='none'"
+                    style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa;">&times;</button>
+
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.5rem;">
+                    <span style="font-size:1.8rem;">🏦</span>
+                    <div>
+                        <div style="font-weight:800;font-size:1.05rem;color:#1a2035;">NACH Mandate Registration</div>
+                        <div style="font-size:0.8rem;color:#7f8c8d;">National Automated Clearing House  · Mock Simulation</div>
+                    </div>
+                </div>
+
+                <!-- Offer summary strip -->
+                <div style="background:#f4f6fb;border-radius:8px;padding:0.85rem 1rem;margin-bottom:1.5rem;font-size:0.85rem;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
+                        <span style="color:#95a5a6;">Merchant</span>
+                        <strong>{{ merchant.merchant_id }}</strong>
+                    </div>
+                    {% if risk_score.financial_offer and risk_score.financial_offer.credit %}
+                    <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
+                        <span style="color:#95a5a6;">Credit Limit</span>
+                        <strong style="color:#f5a623;">₹{{ "{:,}".format((risk_score.financial_offer.credit.credit_limit_lakhs * 100000)|int) }}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;">
+                        <span style="color:#95a5a6;">Interest Rate</span>
+                        <strong>{{ risk_score.financial_offer.credit.interest_rate_percent }}% p.a.</strong>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <form method="POST" action="/dashboard/{{ merchant.merchant_id }}/accept" id="nachForm">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                        <div>
+                            <label style="font-size:0.78rem;font-weight:700;color:#555;display:block;margin-bottom:0.3rem;">Account Holder Name</label>
+                            <input type="text" name="nach_name" required placeholder="Business owner name"
+                                style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #ddd;border-radius:6px;font-size:0.85rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.78rem;font-weight:700;color:#555;display:block;margin-bottom:0.3rem;">Bank Name</label>
+                            <select name="nach_bank" required
+                                style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #ddd;border-radius:6px;font-size:0.85rem;box-sizing:border-box;background:white;">
+                                <option value="">Select bank…</option>
+                                <option>HDFC Bank</option><option>ICICI Bank</option><option>SBI</option>
+                                <option>Axis Bank</option><option>Kotak Mahindra</option><option>Yes Bank</option>
+                                <option>Punjab National Bank</option><option>Bank of Baroda</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                        <div>
+                            <label style="font-size:0.78rem;font-weight:700;color:#555;display:block;margin-bottom:0.3rem;">Account Number</label>
+                            <input type="text" name="nach_account" required placeholder="e.g. 001234567890"
+                                style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #ddd;border-radius:6px;font-size:0.85rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.78rem;font-weight:700;color:#555;display:block;margin-bottom:0.3rem;">IFSC Code</label>
+                            <input type="text" name="nach_ifsc" required placeholder="e.g. HDFC0001234"
+                                style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #ddd;border-radius:6px;font-size:0.85rem;box-sizing:border-box;"
+                                oninput="this.value=this.value.toUpperCase()">
+                        </div>
+                    </div>
+                    <div style="margin-bottom:1.25rem;">
+                        <label style="font-size:0.78rem;font-weight:700;color:#555;display:block;margin-bottom:0.3rem;">Debit Frequency</label>
+                        <select name="nach_frequency"
+                            style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #ddd;border-radius:6px;font-size:0.85rem;background:white;">
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                        </select>
+                    </div>
+                    <div style="background:#fff3cd;border-radius:6px;padding:0.65rem 0.85rem;margin-bottom:1.25rem;font-size:0.78rem;color:#856404;">
+                        🔒 This is a <strong>mock simulation</strong>. No real bank debit will be initiated.
+                        NACH mandate data is recorded for demo purposes only.
+                    </div>
+                    <div style="display:flex;gap:0.75rem;">
+                        <button type="submit" onclick="this.textContent='⏳ Registering…';this.disabled=true;"
+                            style="flex:1;padding:0.8rem;background:linear-gradient(135deg,#f5a623,#ff7b2f);color:white;border:none;border-radius:8px;font-weight:800;font-size:0.95rem;cursor:pointer;">
+                            🏦 Confirm &amp; Register NACH
+                        </button>
+                        <button type="button" onclick="document.getElementById('nachModal').style.display='none'"
+                            style="padding:0.8rem 1.2rem;background:#f0f2f5;color:#555;border:none;border-radius:8px;font-weight:600;cursor:pointer;">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- ── / NACH Modal ───────────────────────────────────────────── -->
+
         {% elif risk_score.offer_status == 'ACCEPTED' %}
         <div class="card-section">
             <h2 class="section-title">Offer Status</h2>
-            
-            <div style="padding: 1.5rem; background: #d4edda; border-radius: 6px; border-left: 4px solid #27ae60;">
-                <h3 style="color: #155724; margin-bottom: 0.5rem;">Offer Accepted</h3>
-                <p style="color: #155724; margin-bottom: 0;">
-                    This merchant has accepted the credit offer. Proceed with loan documentation and onboarding.
+
+            <div style="padding: 1.5rem; background: #d4edda; border-radius: 10px; border-left: 4px solid #27ae60; margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+                    <span style="font-size:1.5rem;">✅</span>
+                    <h3 style="color: #155724; margin: 0;">Offer Accepted · NACH Mandate Registered</h3>
+                </div>
+                <p style="color: #155724; margin-bottom: 0; font-size:0.9rem;">
+                    This merchant has accepted the GrabCredit offer and the mock NACH mandate has been registered.
+                    Our onboarding team will initiate loan documentation within 2 business days.
                 </p>
             </div>
-            
+            <div style="background:#f4f6fb;border-radius:8px;padding:0.85rem 1rem;font-size:0.85rem;color:#555;margin-bottom:1rem;">
+                📋 <strong>Next Steps:</strong> Loan agreement → KYC verification → First disbursement within 5 business days.
+            </div>
+
             <div class="button-group">
-                <a href="/dashboard/" class="btn-secondary-custom">
-                    Back to Dashboard
-                </a>
+                <a href="/dashboard/" class="btn-secondary-custom">Back to Dashboard</a>
             </div>
         </div>
         {% else %}
@@ -736,17 +947,45 @@
             <div style="padding: 1.5rem; background: #f8d7da; border-radius: 6px; border-left: 4px solid #e74c3c;">
                 <h3 style="color: #721c24; margin-bottom: 0.5rem;">Offer Not Available</h3>
                 <p style="color: #721c24; margin-bottom: 0;">
-                    This merchant was rejected and no offer is available at this time.
+                    This merchant did not qualify for a credit offer based on the current risk assessment.
                 </p>
             </div>
             
             <div class="button-group">
-                <a href="/dashboard/" class="btn-secondary-custom">
-                    Back to Dashboard
-                </a>
+                <a href="/dashboard/" class="btn-secondary-custom">Back to Dashboard</a>
             </div>
         </div>
         {% endif %}
+
+        <!-- ── WhatsApp Notification Card (always visible once assessed) ───── -->
+        <div class="card-section" style="border:2px solid #25D366;border-radius:10px;padding:1.25rem 1.5rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+                <div>
+                    <div style="font-weight:800;font-size:1rem;color:#1a2035;margin-bottom:0.25rem;">📲 WhatsApp Notification</div>
+                    <div style="font-size:0.82rem;color:#7f8c8d;">
+                        {% if risk_score.whatsapp_status == 'SENT' %}
+                            <span style="color:#27ae60;font-weight:700;">✅ Offer sent via WhatsApp</span> — resend if needed
+                        {% elif risk_score.whatsapp_status == 'FAILED' %}
+                            <span style="color:#e74c3c;font-weight:700;">❌ Last send failed</span> — check test-mode settings or mobile number, then retry
+                        {% else %}
+                            Not yet sent. Click to deliver the offer notification to this merchant.
+                        {% endif %}
+                    </div>
+                </div>
+                <form method="POST" action="/dashboard/{{ merchant.merchant_id }}/send-offer">
+                    <button type="submit"
+                        style="padding:0.65rem 1.4rem;background:#25D366;color:white;border:none;border-radius:7px;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;">
+                        {% if risk_score.whatsapp_status == 'SENT' %}🔁 Resend WhatsApp{% else %}📤 Send via WhatsApp{% endif %}
+                    </button>
+                </form>
+            </div>
+            {% if not merchant.mobile_number %}
+            <div style="margin-top:0.65rem;padding:0.5rem 0.75rem;background:#fff3cd;border-radius:5px;font-size:0.78rem;color:#856404;">
+                ⚠ No mobile number set for this merchant. Either set one in the <strong>Mobile Number</strong> field above,
+                or enable <strong>WhatsApp Test Override</strong> in System Config to route to your number.
+            </div>
+            {% endif %}
+        </div>
 
         <!-- Footer -->
         <div class="footer-nav">
